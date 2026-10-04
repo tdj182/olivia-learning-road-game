@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MODULES, ALL_WORDS, NUMBER_RANGES, buildPool, buildNumberPool, confusableNumbers } from './words.js';
+import { inventory } from './potions.js';
+import { createLab } from './lab.js';
+import { createBattle } from './battle.js';
 
 // ---------- Tuning ----------
 const LANES = [-2.6, 0, 2.6];
@@ -36,7 +39,7 @@ const canvas = $('c');
 const ui = {
   loading: $('loading'), hud: $('hud'), menu: $('menu'), pause: $('pauseOverlay'),
   targetWord: $('targetWord'), starCount: $('starCount'), stars: $('stars'),
-  toast: $('toast'), banner: $('banner'),
+  toast: $('toast'), banner: $('banner'), bag: $('bag'), bagCount: $('bagCount'),
 };
 
 // ---------- Renderer / scene ----------
@@ -124,7 +127,7 @@ function normalize(obj, { height, length }) {
   return wrap;
 }
 
-let truck, truckBody, dog, dogMixer, dogActions = {};
+let truck, truckBody, dog, dogMixer, dogActions = {}, flowerProto;
 
 async function loadWorld() {
   const NATURE = 'assets/models/nature/';
@@ -171,6 +174,7 @@ async function loadWorld() {
     { gltf: nature[5], h: 0.7, w: 4 }, { gltf: nature[6], h: 0.7, w: 4 },
   ].map(k => ({ ...k, proto: normalize(k.gltf.scene, { height: k.h }) }));
   const weighted = kinds.flatMap(k => Array(k.w).fill(k));
+  flowerProto = kinds[5].proto;
 
   for (let i = 0; i < 70; i++) {
     const k = weighted[Math.floor(Math.random() * weighted.length)];
@@ -250,18 +254,25 @@ function disposeGroup(g) {
 // ---------- Particles ----------
 const particles = [];
 const partGeo = new THREE.PlaneGeometry(0.22, 0.22);
-const partColors = ['#ff6fa8', '#ffd23f', '#3fa7ff', '#38c172', '#b57cff', '#ff9f43'].map(c => new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide }));
+const CONFETTI = ['#ff6fa8', '#ffd23f', '#3fa7ff', '#38c172', '#b57cff', '#ff9f43'];
+const partMats = new Map();
+const partMat = c => {
+  if (!partMats.has(c)) partMats.set(c, new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide }));
+  return partMats.get(c);
+};
 
-function burst(pos, count = 50) {
+function burst(pos, count = 50, colors = CONFETTI, target = scene, power = 1) {
   for (let i = 0; i < count; i++) {
-    const p = new THREE.Mesh(partGeo, partColors[i % partColors.length]);
+    const p = new THREE.Mesh(partGeo, partMat(colors[i % colors.length]));
     p.position.copy(pos);
+    p.scale.setScalar(Math.max(0.5, power));
     p.userData = {
-      v: new THREE.Vector3((Math.random() - 0.5) * 7, 3 + Math.random() * 6, (Math.random() - 0.5) * 5),
+      v: new THREE.Vector3((Math.random() - 0.5) * 7 * power, (3 + Math.random() * 6) * power, (Math.random() - 0.5) * 5 * power),
       spin: new THREE.Vector3(Math.random() * 10, Math.random() * 10, 0),
       life: 1.4 + Math.random() * 0.6,
+      scene: target,
     };
-    scene.add(p);
+    target.add(p);
     particles.push(p);
   }
 }
@@ -276,7 +287,7 @@ function updateParticles(dt) {
     p.rotation.x += d.spin.x * dt;
     p.rotation.y += d.spin.y * dt;
     if (d.life <= 0 || p.position.y < 0) {
-      scene.remove(p);
+      d.scene.remove(p);
       particles.splice(i, 1);
     }
   }
@@ -305,7 +316,27 @@ const sfx = {
   oops: () => { tone(392, 0, 0.22, 'sine', 0.12); tone(311, 0.2, 0.35, 'sine', 0.12); },
   move: () => tone(660, 0, 0.07, 'sine', 0.05),
   fanfare: () => [523, 659, 784, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.12, 0.35, 'square', 0.07)),
+  plop: () => { tone(220, 0, 0.12, 'sine', 0.2); tone(440, 0.05, 0.15, 'sine', 0.1); },
+  brew: () => [392, 494, 587, 698, 784, 880, 988, 1175].forEach((f, i) => tone(f, i * 0.16, 0.3, 'triangle', 0.1)),
+  whoosh: () => [700, 600, 500, 420].forEach((f, i) => tone(f, i * 0.04, 0.08, 'sine', 0.06)),
+  splash: () => { tone(180, 0, 0.25, 'triangle', 0.18); tone(900, 0.02, 0.15, 'sine', 0.06); tone(1200, 0.08, 0.12, 'sine', 0.05); },
+  chirp: () => [880, 1175, 1568].forEach((f, i) => tone(f, i * 0.07, 0.14, 'sine', 0.08)),
 };
+
+// Little emoji that flies across the screen (ingredients into the bag / pot).
+function flyEmoji(emoji, from, to, done) {
+  const e = document.createElement('div');
+  e.className = 'fly-emoji';
+  e.textContent = emoji;
+  document.body.appendChild(e);
+  const mid = { x: (from.x + to.x) / 2, y: Math.min(from.y, to.y) - 120 };
+  const at = (p, s) => `translate(${p.x - 22}px, ${p.y - 26}px) scale(${s})`;
+  const anim = e.animate(
+    [{ transform: at(from, 0.6) }, { transform: at(mid, 1.4), offset: 0.5 }, { transform: at(to, 0.7) }],
+    { duration: 750, easing: 'ease-in-out' },
+  );
+  anim.onfinish = () => { e.remove(); done?.(); };
+}
 
 let voice = null;
 function pickVoice() {
@@ -415,6 +446,7 @@ function evaluateGate() {
     const p = new THREE.Vector3();
     chosen.userData.board.getWorldPosition(p);
     burst(p);
+    awardIngredient(p);
     chosen.userData.pop = 0;
     sfx.good();
     const praise = PRAISE[Math.floor(Math.random() * PRAISE.length)];
@@ -445,6 +477,13 @@ function celebrate() {
   setTimeout(() => ui.banner.classList.remove('show'), 2600);
 }
 
+function setDogIdle(idle) {
+  const from = idle ? dogActions.Gallop : dogActions.Idle;
+  const to = idle ? dogActions.Idle : dogActions.Gallop;
+  from?.fadeOut(0.3);
+  to?.reset().fadeIn(0.3).play();
+}
+
 function dogJump() {
   const j = dogActions.Gallop_Jump;
   if (!j) return;
@@ -452,6 +491,20 @@ function dogJump() {
   j.clampWhenFinished = false;
   dogActions.Gallop?.fadeOut(0.15);
   j.fadeIn(0.15).play();
+}
+
+function updateBag(bump = false) {
+  ui.bagCount.textContent = inventory.ingredientCount();
+  ui.bag.classList.toggle('ready', inventory.ingredientCount() >= 3);
+  if (bump) { ui.bag.classList.remove('bump'); void ui.bag.offsetWidth; ui.bag.classList.add('bump'); }
+}
+
+function awardIngredient(fromWorld) {
+  const ing = inventory.addRandomIngredient();
+  const v = fromWorld.clone().project(camera);
+  const from = { x: (v.x + 1) / 2 * window.innerWidth, y: (1 - v.y) / 2 * window.innerHeight };
+  const r = ui.bag.getBoundingClientRect();
+  flyEmoji(ing.emoji, from, { x: r.left + r.width / 2, y: r.top + r.height / 2 }, () => updateBag(true));
 }
 
 let toastTimer;
@@ -476,7 +529,39 @@ function clearGate() {
 }
 
 // ---------- Screens ----------
+function leaveMode() {
+  if (game.mode === 'lab') lab.exit();
+  if (game.mode === 'battle') battle.exit();
+}
+
+function enterLab() {
+  leaveMode();
+  game.mode = 'lab';
+  clearGate();
+  speechSynthesis?.cancel();
+  ui.menu.hidden = ui.hud.hidden = ui.pause.hidden = true;
+  lab.enter();
+}
+
+function enterBattle() {
+  if (!inventory.potionCount()) return enterLab();
+  leaveMode();
+  game.mode = 'battle';
+  clearGate();
+  speechSynthesis?.cancel();
+  ui.menu.hidden = ui.hud.hidden = ui.pause.hidden = true;
+  game.lane = 1;
+  battle.enter();
+}
+
+function exitTo(where) {
+  if (where === 'learn') startGame();
+  else if (where === 'lab') enterLab();
+  else showMenu();
+}
+
 function startGame() {
+  leaveMode();
   game.pool = currentPool();
   if (!game.pool.length) return;
   game.mode = 'play';
@@ -489,12 +574,14 @@ function startGame() {
   ui.menu.hidden = true;
   ui.pause.hidden = true;
   ui.hud.hidden = false;
+  updateBag();
   clearGate();
   game.nextRoundIn = 0.8;
   say([["Let's go, Olivia!", 1]]);
 }
 
 function showMenu() {
+  leaveMode();
   game.mode = 'menu';
   game.paused = false;
   clearGate();
@@ -544,6 +631,9 @@ function renderMenu() {
     ? `${pool.length} ${numbers ? 'numbers' : 'words'} to practice`
     : numbers ? 'Pick at least one group of numbers' : 'Pick at least one module and word type';
   $('btnPlay').disabled = !pool.length;
+  $('menuBag').textContent = `🧺 ${inventory.ingredientCount()}`;
+  $('menuPotions').textContent = `🧪 ${inventory.potionCount()}`;
+  $('btnMenuBattle').disabled = !inventory.potionCount();
   $('totalStars').textContent = totalStars;
 
   const tricky = Object.entries(stats)
@@ -561,6 +651,9 @@ function saveSettings() {
 
 // ---------- Input ----------
 $('btnPlay').onclick = startGame;
+$('btnMenuLab').onclick = enterLab;
+$('btnMenuBattle').onclick = enterBattle;
+$('bag').onclick = () => { if (inventory.ingredientCount() >= 3 || inventory.potionCount()) enterLab(); };
 $('btnHome').onclick = showMenu;
 $('btnPause').onclick = () => setPaused(true);
 $('btnResume').onclick = () => setPaused(false);
@@ -581,13 +674,15 @@ $('tShow').onclick = () => { settings.showWord = !settings.showWord; saveSetting
 
 // Tapping a third of the screen jumps to that lane.
 canvas.addEventListener('pointerdown', e => {
+  if (game.mode === 'battle') return battle.onPointer(e);
   if (game.mode !== 'play' || game.paused) return;
   setLane(Math.floor((e.clientX / window.innerWidth) * 3));
 });
 
 window.addEventListener('keydown', e => {
   if (game.mode !== 'play') {
-    if (e.key === 'Enter' && !ui.menu.hidden) startGame();
+    if (e.key === 'Enter' && game.mode === 'menu') startGame();
+    if (e.key === 'Escape' && (game.mode === 'lab' || game.mode === 'battle')) showMenu();
     return;
   }
   if (e.key === 'ArrowLeft' || e.key === 'a') setLane(game.lane - 1);
@@ -610,20 +705,29 @@ function resize() {
   camera.position.set(0, 4.6 + narrow * 3, 7.8 + narrow * 7);
   camera.lookAt(cameraLook);
   camera.updateProjectionMatrix();
+  lab?.resize(aspect);
 }
 window.addEventListener('resize', resize);
-resize();
 
 const clock = new THREE.Clock();
 let t = 0;
 
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
-  const running = game.mode === 'menu' || !game.paused;
+  const running = game.mode !== 'play' || !game.paused;
+
+  if (game.mode === 'lab') {
+    t += dt;
+    lab.update(dt, t);
+    updateParticles(dt);
+    renderer.render(lab.scene, lab.camera);
+    requestAnimationFrame(tick);
+    return;
+  }
 
   if (running) {
     t += dt;
-    const speed = game.mode === 'menu' ? SPEED * 0.6 : SPEED;
+    const speed = game.mode === 'menu' ? SPEED * 0.6 : game.mode === 'battle' ? 0 : SPEED;
     const dz = speed * dt;
 
     for (const o of scrollers) {
@@ -639,6 +743,7 @@ function tick() {
       truckBody.position.y = Math.abs(Math.sin(t * 9)) * 0.03;
     }
     if (dogMixer) dogMixer.update(dt);
+    if (game.mode === 'battle') battle.update(dt);
 
     if (game.mode === 'play') {
       const gate = game.gate;
@@ -678,6 +783,15 @@ function tick() {
   requestAnimationFrame(tick);
 }
 
+// ---------- Fun modes ----------
+const lab = createLab({ loadModel, normalize, burst, say, sfx, flyEmoji, onExit: exitTo, onBattle: enterBattle });
+const battle = createBattle({
+  scene, camera, loadModel, normalize, burst, say, sfx, setDogIdle, onExit: exitTo,
+  getTruck: () => truck,
+  makeFlower: () => { const f = flowerProto.clone(); f.scale.multiplyScalar(1.6); return f; },
+});
+resize();
+
 // ---------- Boot ----------
 (async () => {
   try {
@@ -693,5 +807,10 @@ function tick() {
   ui.loading.hidden = true;
   showMenu();
   if (location.hash === '#play') startGame();
+  if (location.hash === '#lab') enterLab();
+  if (location.hash === '#battle') enterBattle();
   tick();
+  // Warm up the fun-mode models in the background.
+  lab.load().catch(() => {});
+  battle.load().catch(() => {});
 })();

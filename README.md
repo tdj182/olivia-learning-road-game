@@ -11,6 +11,17 @@ The game says a word out loud. Steer the truck into the sign with that word.
 - On the start screen you can switch between **Words** and **Numbers**. For words, pick modules and word types. For numbers, pick groups of ten (1–10 … 91–100). One wrong sign is usually a look-alike number (17/71, 13/30, 46/47).
 - On the start screen you can also turn off "Show the word" to make it listening only.
 
+## Potions and Monster Splash (the reward loop)
+
+1. **Read to earn.** Each correct answer drops a random ingredient (🍓🍄🌸🥕🍏🍯💎⭐) into the basket under the stars. She starts with 8 ingredients so she can try it right away.
+2. **Potion Lab 🧪.** Tap 3 ingredients into the cauldron (tap one in a slot to take it back), then tap **Stir!**
+   - 3 of the same ingredient makes a **Super** potion, which splashes a bigger area.
+   - 3 different ingredients make a **Rainbow** potion, which splashes every monster at once.
+   - Anything else makes a colored potion with a silly name ("Giggly Red Potion").
+3. **Monster Splash 💥.** Cute monsters waddle down the road. Tap one to throw the selected potion. Splashed monsters dance, turn into friends, and leave a flower. Nobody loses. When the potions run out, it's **Back to reading!**
+
+Ingredients only come from correct answers, so the fun modes always lead back to learning. Get to the Lab from the basket button during play or from the start screen.
+
 Plain HTML/JS with [three.js](https://threejs.org) from a CDN, so there is no build step. To run it locally: `python -m http.server`, then open http://localhost:8000.
 
 The words are in `js/words.js`.

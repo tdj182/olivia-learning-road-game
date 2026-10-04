@@ -34,7 +34,10 @@
       <span id="targetWord"></span>
       <button id="btnSay" class="round small" aria-label="Say the word again">🔊</button>
     </div>
-    <div id="stars"><span class="star">⭐</span><span id="starCount">0</span></div>
+    <div class="hud-right">
+      <div id="stars"><span class="star">⭐</span><span id="starCount">0</span></div>
+      <button id="bag" class="bag" aria-label="Potion Lab"><span>🧺</span><span id="bagCount">0</span><span class="go">🧪</span></button>
+    </div>
     <button id="btnLeft" class="steer" aria-label="Move left">
       <svg viewBox="0 0 24 24"><path d="M15 4 7 12l8 8" /></svg>
     </button>
@@ -43,6 +46,38 @@
     </button>
     <div id="toast"></div>
     <div id="banner"></div>
+  </div>
+
+  <div id="lab" class="mode-ui" hidden>
+    <button id="btnLabHome" class="round corner-left" aria-label="Home">🏠</button>
+    <div class="mode-title">🧪 Potion Lab</div>
+    <div class="corner-right shelf-count" title="Potions"><span>🧪</span><span id="labPotionCount">0</span></div>
+    <div class="lab-bottom">
+      <p id="labMsg" class="lab-msg"></p>
+      <div id="labSlots" class="slots"></div>
+      <div class="lab-actions">
+        <button id="btnBrew" class="big">Stir! 🥄</button>
+      </div>
+      <div id="labTray" class="tray"></div>
+      <div class="lab-actions small">
+        <button id="btnLabLearn" class="pill">📚 Read words</button>
+        <button id="btnLabBattle" class="pill hot">💥 Monster Splash</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="battle" class="mode-ui" hidden>
+    <button id="btnBattleHome" class="round corner-left" aria-label="Home">🏠</button>
+    <div class="mode-title">💖 Friends: <span id="friendCount">0</span></div>
+    <div id="battleHint" class="battle-hint">Tap a monster to splash it! 👆</div>
+    <div id="potionBar" class="potion-bar"></div>
+    <div id="battleEnd" class="overlay" hidden>
+      <div class="card">
+        <h2 id="battleEndText"></h2>
+        <button id="btnBattleLearn" class="big">Back to reading! 📚</button>
+        <p><button id="btnBattleLab" class="pill">🧪 Make more potions</button></p>
+      </div>
+    </div>
   </div>
 
   <div id="pauseOverlay" hidden>
@@ -58,6 +93,10 @@
       <p class="sub">Listen, then drive into the right sign!</p>
 
       <button id="btnPlay" class="big">Let's go! 🚚</button>
+      <div class="fun-row">
+        <button id="btnMenuLab" class="pill">🧪 Potion Lab <small id="menuBag"></small></button>
+        <button id="btnMenuBattle" class="pill hot">💥 Monster Splash <small id="menuPotions"></small></button>
+      </div>
 
       <section>
         <h3>Practice</h3>

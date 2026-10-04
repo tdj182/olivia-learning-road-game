@@ -72,8 +72,21 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; }
 }
 #targetWord.hidden-word { font-size: 40px; letter-spacing: 4px; opacity: 0.5; }
 
-#stars {
+.hud-right {
   position: absolute; top: max(14px, env(safe-area-inset-top)); right: 14px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+}
+.bag {
+  display: flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 26px;
+  background: var(--card); box-shadow: var(--shadow); font-size: 24px; font-weight: 800;
+}
+.bag .go { display: none; }
+.bag.ready { border: 4px solid #b57cff; }
+.bag.ready .go { display: inline; animation: wiggle 1.2s ease-in-out infinite; }
+.bag.bump { animation: bump 0.5s ease; }
+@keyframes wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-14deg); } 75% { transform: rotate(14deg); } }
+
+#stars {
   background: var(--card); border-radius: 28px; padding: 6px 18px;
   box-shadow: var(--shadow); font-size: 30px; font-weight: 800;
   display: flex; align-items: center; gap: 6px;
@@ -158,3 +171,104 @@ section { margin-top: 20px; }
   #toast { font-size: 26px; }
   #banner { font-size: 30px; }
 }
+
+/* Shared bits for Lab + Battle */
+.pill {
+  background: var(--card); border-radius: 30px; padding: 10px 20px; font-size: 20px; font-weight: 800;
+  box-shadow: var(--shadow); border: 3px solid #e3d9ff;
+}
+.pill.hot { background: #ffe3ee; border-color: var(--pink); }
+.pill:disabled { opacity: 0.45; cursor: default; }
+.pill small { opacity: 0.7; font-size: 0.8em; }
+.pulse { animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.08); } }
+.fun-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 16px; }
+
+.mode-ui { position: fixed; inset: 0; z-index: 12; pointer-events: none; }
+.mode-ui button, .mode-ui .tray, .mode-ui .slots, .mode-ui .overlay { pointer-events: auto; }
+.corner-left { position: absolute; top: max(14px, env(safe-area-inset-top)); left: 14px; }
+.corner-right { position: absolute; top: max(14px, env(safe-area-inset-top)); right: 14px; }
+.mode-title {
+  position: absolute; top: max(14px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  background: var(--card); border-radius: 26px; padding: 8px 22px; box-shadow: var(--shadow);
+  font-size: 26px; font-weight: 800; white-space: nowrap; border: 4px solid #b57cff;
+}
+.shelf-count {
+  background: var(--card); border-radius: 26px; padding: 6px 16px; box-shadow: var(--shadow);
+  font-size: 26px; font-weight: 800; display: flex; gap: 6px;
+}
+
+/* Lab */
+.lab-bottom {
+  position: absolute; left: 0; right: 0; bottom: max(12px, env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 0 12px;
+}
+.lab-msg {
+  margin: 0; background: rgba(255, 253, 246, 0.95); border-radius: 20px; padding: 6px 18px;
+  font-size: 22px; font-weight: 800; display: flex; align-items: center; gap: 8px; box-shadow: var(--shadow);
+  text-align: center;
+}
+.lab-msg:empty { display: none; }
+.slots { display: flex; align-items: center; gap: 6px; }
+.slot {
+  width: 64px; height: 64px; border-radius: 50%; font-size: 36px;
+  background: rgba(255, 253, 246, 0.9); border: 4px dashed #b57cff; display: grid; place-items: center;
+}
+.slot:disabled { cursor: default; color: inherit; }
+.plus { font-size: 28px; font-weight: 800; color: #fff; }
+.tray {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+  background: rgba(255, 253, 246, 0.95); border-radius: 26px; padding: 10px; box-shadow: var(--shadow);
+  max-width: 640px;
+}
+.ing {
+  position: relative; width: 64px; height: 64px; border-radius: 18px; background: #f3eefe;
+  display: grid; place-items: center;
+}
+.ing .e { font-size: 38px; line-height: 1; }
+.ing .n {
+  position: absolute; right: -4px; bottom: -4px; min-width: 26px; height: 26px; border-radius: 13px;
+  background: var(--ink); color: #fff; font-size: 16px; font-weight: 800; display: grid; place-items: center;
+}
+.ing:disabled { opacity: 0.35; cursor: default; }
+.lab-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.lab-actions .big { padding: 8px 34px; font-size: 30px; background: #9b5de5; box-shadow: 0 6px 0 #6b3fb0, 0 12px 24px rgba(0,0,0,0.15); }
+.lab-actions .big:disabled { background: #aab; box-shadow: 0 6px 0 #889; }
+.fly-emoji { position: fixed; z-index: 30; font-size: 44px; pointer-events: none; left: 0; top: 0; }
+
+/* Battle */
+.potion-bar {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom));
+  display: flex; gap: 8px; max-width: calc(100% - 24px); overflow-x: auto; padding: 8px 10px;
+  background: rgba(255, 253, 246, 0.92); border-radius: 26px; box-shadow: var(--shadow); pointer-events: auto;
+}
+.potion-btn {
+  position: relative; flex: none; width: 64px; height: 64px; border-radius: 18px; background: #f3eefe;
+  display: grid; place-items: center; border: 4px solid transparent;
+}
+.potion-btn[aria-pressed="true"] { border-color: var(--pink); background: #ffe3ee; }
+.potion-btn .n {
+  position: absolute; right: -4px; bottom: -4px; min-width: 26px; height: 26px; border-radius: 13px;
+  background: var(--ink); color: #fff; font-size: 16px; font-weight: 800; display: grid; place-items: center;
+}
+.battle-hint {
+  position: absolute; left: 50%; top: 20%; transform: translate(-50%, -50%);
+  background: var(--card); border-radius: 24px; padding: 12px 24px; box-shadow: var(--shadow);
+  font-size: 28px; font-weight: 800; opacity: 0; transition: opacity 0.3s; white-space: nowrap;
+}
+.battle-hint.show { opacity: 1; animation: pulse 1.2s ease-in-out infinite; }
+.overlay {
+  position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
+  background: rgba(159, 216, 255, 0.4);
+}
+.overlay h2 b { color: var(--pink); }
+
+@media (max-width: 600px) {
+  .mode-title { top: 72px; font-size: 22px; }
+  .slot, .ing, .potion-btn { width: 54px; height: 54px; }
+  .tray { display: grid; grid-template-columns: repeat(4, 54px); gap: 10px; }
+  .ing .e { font-size: 32px; }
+  .lab-msg { font-size: 18px; }
+  .battle-hint { font-size: 22px; }
+}
+.potion-bar:empty { display: none; }
