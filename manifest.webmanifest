@@ -1,0 +1,15 @@
+{
+  "name": "Olivia's Word Road",
+  "short_name": "Word Road",
+  "description": "A driving game for practicing kindergarten words and numbers.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#9fd8ff",
+  "theme_color": "#9fd8ff",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

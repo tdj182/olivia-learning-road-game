@@ -1,0 +1,37 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Icon generator</title><link rel="stylesheet" href="../vendor/fonts/fonts.css"></head><body>
+<!-- Open via a local server, then run icons() in the console (or tools via CDP) to get PNG data URLs. -->
+<script>
+// Full-bleed icon with content inside the maskable safe zone (center 80%).
+function draw(size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  const s = size / 512;
+  const sky = g.createLinearGradient(0, 0, 0, size);
+  sky.addColorStop(0, '#7cc8ff');
+  sky.addColorStop(0.62, '#bfe6ff');
+  g.fillStyle = sky; g.fillRect(0, 0, size, size);
+  g.fillStyle = '#8fd16a'; g.fillRect(0, 300 * s, size, size);
+  // road
+  g.fillStyle = '#5f6676';
+  g.beginPath(); g.moveTo(236 * s, 300 * s); g.lineTo(276 * s, 300 * s); g.lineTo(430 * s, 512 * s); g.lineTo(82 * s, 512 * s); g.closePath(); g.fill();
+  g.strokeStyle = '#ffe066'; g.lineWidth = 8 * s; g.setLineDash([22 * s, 18 * s]);
+  g.beginPath(); g.moveTo(256 * s, 305 * s); g.lineTo(256 * s, 512 * s); g.stroke();
+  // sign with "abc"
+  g.setLineDash([]);
+  g.fillStyle = '#8a5a3b'; g.fillRect(150 * s, 170 * s, 12 * s, 120 * s); g.fillRect(350 * s, 170 * s, 12 * s, 120 * s);
+  g.fillStyle = '#ff6fa8';
+  g.beginPath(); g.roundRect(118 * s, 92 * s, 276 * s, 128 * s, 30 * s); g.fill();
+  g.fillStyle = '#fffdf6';
+  g.beginPath(); g.roundRect(132 * s, 106 * s, 248 * s, 100 * s, 20 * s); g.fill();
+  g.fillStyle = '#23315e'; g.font = `700 ${84 * s}px Andika, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('abc', 256 * s, 160 * s);
+  // truck
+  g.font = `${150 * s}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+  g.fillText('🚚', 256 * s, 370 * s);
+  return c.toDataURL('image/png');
+}
+window.icons = () => ({ i192: draw(192), i512: draw(512), i180: draw(180) });
+</script>
+</body></html>

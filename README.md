@@ -22,7 +22,23 @@ The game says a word out loud. Steer the truck into the sign with that word.
 
 Ingredients only come from correct answers, so the fun modes always lead back to learning. Get to the Lab from the basket button during play or from the start screen.
 
-Plain HTML/JS with [three.js](https://threejs.org) from a CDN, so there is no build step. To run it locally: `python -m http.server`, then open http://localhost:8000.
+## Offline and home screen
+
+Open the site once while online. When the start screen shows **✓ Ready to play offline**, the whole game is saved on the device and works without internet. Updates download in the background the next time it's online.
+
+To get the app-style version with no browser bars:
+- **iPad/iPhone (Safari):** Share → Add to Home Screen.
+- **Android/Chrome:** ⋮ menu → Install app / Add to Home screen.
+
+Progress (stars, ingredients, potions) is saved on the device.
+
+## Development
+
+Plain HTML/JS with [three.js](https://threejs.org) copied into `vendor/`, so there is no build step.
+
+**After adding or changing any game file, run `node tools/build-sw.mjs`.** It refreshes the offline file list and version in `sw.js`, which is how devices pick up the update. To run it locally: `python -m http.server`, then open http://localhost:8000.
+
+`tools/icon.html` draws the app icons.
 
 The words are in `js/words.js`.
 

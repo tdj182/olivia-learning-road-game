@@ -339,11 +339,14 @@ function flyEmoji(emoji, from, to, done) {
 }
 
 let voice = null;
+let offlineVoice = null; // an on-device voice, for when there's no internet
 function pickVoice() {
   const vs = window.speechSynthesis?.getVoices() ?? [];
+  const best = list => list.find(v => /samantha|aria|jenny|zira|google us english|female/i.test(v.name))
+    || list.find(v => /en[-_]us/i.test(v.lang)) || list[0] || null;
   const en = vs.filter(v => /^en[-_]/i.test(v.lang));
-  voice = en.find(v => /samantha|aria|jenny|zira|google us english|female/i.test(v.name))
-    || en.find(v => /en[-_]us/i.test(v.lang)) || en[0] || null;
+  voice = best(en);
+  offlineVoice = best(en.filter(v => v.localService));
 }
 if ('speechSynthesis' in window) {
   pickVoice();
@@ -353,10 +356,12 @@ if ('speechSynthesis' in window) {
 function say(parts, { interrupt = true } = {}) {
   if (!('speechSynthesis' in window)) return;
   if (interrupt) speechSynthesis.cancel();
+  // Online-only voices go silent offline, so fall back to one on the device.
+  const v = navigator.onLine || voice?.localService ? voice : offlineVoice;
   for (const [text, rate] of parts) {
     const u = new SpeechSynthesisUtterance(text);
-    if (voice) u.voice = voice;
-    u.lang = voice?.lang ?? 'en-US';
+    if (v) u.voice = v;
+    u.lang = v?.lang ?? 'en-US';
     u.rate = rate;
     u.pitch = 1.1;
     speechSynthesis.speak(u);
@@ -810,6 +815,11 @@ resize();
   if (location.hash === '#lab') enterLab();
   if (location.hash === '#battle') enterBattle();
   tick();
+  // Save everything for offline play (sw.js), and say so on the start screen.
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('sw.js').catch(err => console.warn('Offline mode unavailable', err));
+    navigator.serviceWorker.ready.then(() => { $('offlineReady').hidden = false; });
+  }
   // Warm up the fun-mode models in the background.
   lab.load().catch(() => {});
   battle.load().catch(() => {});
