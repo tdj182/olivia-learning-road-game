@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#9fd8ff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Olivia's Word Road</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Baloo+2:wght@600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <div id="loading"><div class="spinner"></div><p>Getting the truck ready…</p></div>
+
+  <div id="hud" hidden>
+    <div class="hud-left">
+      <button id="btnHome" class="round" aria-label="Home">🏠</button>
+      <button id="btnPause" class="round" aria-label="Pause">⏸️</button>
+    </div>
+    <div id="target">
+      <span class="label">Find</span>
+      <span id="targetWord"></span>
+      <button id="btnSay" class="round small" aria-label="Say the word again">🔊</button>
+    </div>
+    <div id="stars"><span class="star">⭐</span><span id="starCount">0</span></div>
+    <button id="btnLeft" class="steer" aria-label="Move left">
+      <svg viewBox="0 0 24 24"><path d="M15 4 7 12l8 8" /></svg>
+    </button>
+    <button id="btnRight" class="steer" aria-label="Move right">
+      <svg viewBox="0 0 24 24"><path d="m9 4 8 8-8 8" /></svg>
+    </button>
+    <div id="toast"></div>
+    <div id="banner"></div>
+  </div>
+
+  <div id="pauseOverlay" hidden>
+    <div class="card">
+      <h2>Taking a break</h2>
+      <button id="btnResume" class="big">Keep driving!</button>
+    </div>
+  </div>
+
+  <div id="menu" hidden>
+    <div class="card menu-card">
+      <h1><span>Olivia's</span> Word Road</h1>
+      <p class="sub">Listen for the word, then drive into its sign!</p>
+
+      <button id="btnPlay" class="big">Let's go! 🚚</button>
+
+      <section>
+        <h3>Modules</h3>
+        <div id="moduleChips" class="chips"></div>
+        <div class="row-links"><button id="selAll" class="link">All</button><button id="selNone" class="link">None</button></div>
+      </section>
+
+      <section>
+        <h3>Words</h3>
+        <div class="chips">
+          <button class="chip" id="tIrregular" aria-pressed="true">❤️ Irregular</button>
+          <button class="chip" id="tDecodable" aria-pressed="true">🔤 Decodable</button>
+          <button class="chip" id="tShow" aria-pressed="true">👀 Show the word</button>
+        </div>
+        <p id="poolInfo" class="hint"></p>
+      </section>
+
+      <section id="trickySection" hidden>
+        <h3>Words to practice</h3>
+        <div id="tricky" class="tricky"></div>
+      </section>
+
+      <p class="total">Total stars: ⭐ <span id="totalStars">0</span></p>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

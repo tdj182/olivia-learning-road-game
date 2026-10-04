@@ -1,0 +1,8 @@
+# Full Quaternius asset library lives outside the repo; only the models the game uses are in assets/models.
+Game Assets/
+*.blend
+*.blend1
+*.fbx
+.DS_Store
+Thumbs.db
+node_modules/
