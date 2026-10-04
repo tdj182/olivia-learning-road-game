@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { MODULES, ALL_WORDS, buildPool } from './words.js';
+import { MODULES, ALL_WORDS, NUMBER_RANGES, buildPool, buildNumberPool, confusableNumbers } from './words.js';
 
 // ---------- Tuning ----------
 const LANES = [-2.6, 0, 2.6];
@@ -24,7 +24,7 @@ const store = {
   },
 };
 const settings = Object.assign(
-  { modules: [1, 2, 3, 4, 5, 6, 7, 8, 9], irregular: true, decodable: true, showWord: true },
+  { mode: 'words', modules: [1, 2, 3, 4, 5, 6, 7, 8, 9], numberRanges: [1, 2], irregular: true, decodable: true, showWord: true },
   store.get('owr-settings', {}),
 );
 const stats = store.get('owr-stats', {});     // word -> { c: correct, m: misses }
@@ -362,8 +362,18 @@ function pickTarget() {
   return choices[choices.length - 1];
 }
 
+const isNumbers = () => settings.mode === 'numbers';
+const currentPool = () => (isNumbers() ? buildNumberPool(settings.numberRanges) : buildPool(settings.modules, settings));
+
 function pickDistractors(target) {
   const shuffle = a => a.sort(() => Math.random() - 0.5);
+  if (/^\d+$/.test(target)) {
+    // One look-alike number (when there is one) plus one from the practice pool.
+    const tricky = shuffle(confusableNumbers(target)).slice(0, 1);
+    const rest = shuffle(game.pool.filter(n => n !== target && !tricky.includes(n)));
+    const all = shuffle(Array.from({ length: 100 }, (_, i) => String(i + 1)).filter(n => n !== target && !tricky.includes(n) && !rest.includes(n)));
+    return [...tricky, ...rest, ...all].slice(0, 2);
+  }
   const fromPool = shuffle(game.pool.filter(w => w !== target && w.toLowerCase() !== target.toLowerCase()));
   const extra = shuffle(ALL_WORDS.filter(w => w !== target && !fromPool.includes(w)));
   return [...fromPool, ...extra].slice(0, 2);
@@ -428,9 +438,10 @@ function evaluateGate() {
 function celebrate() {
   burst(new THREE.Vector3(truck.position.x, 2.5, -2), 90);
   sfx.fanfare();
-  ui.banner.innerHTML = `⭐ ${game.sessionStars} stars! ⭐<br>Great reading, Olivia!`;
+  const cheer = isNumbers() ? 'Great counting, Olivia!' : 'Great reading, Olivia!';
+  ui.banner.innerHTML = `⭐ ${game.sessionStars} stars! ⭐<br>${cheer}`;
   ui.banner.classList.add('show');
-  say([[`${game.sessionStars} stars! Great reading, Olivia!`, 0.95]], { interrupt: false });
+  say([[`${game.sessionStars} stars! ${cheer}`, 0.95]], { interrupt: false });
   setTimeout(() => ui.banner.classList.remove('show'), 2600);
 }
 
@@ -466,7 +477,7 @@ function clearGate() {
 
 // ---------- Screens ----------
 function startGame() {
-  game.pool = buildPool(settings.modules, settings);
+  game.pool = currentPool();
   if (!game.pool.length) return;
   game.mode = 'play';
   game.paused = false;
@@ -505,24 +516,33 @@ function setPaused(p) {
 function renderMenu() {
   const chips = $('moduleChips');
   chips.innerHTML = '';
-  MODULES.forEach((_, i) => {
-    const n = i + 1;
+  const numbers = isNumbers();
+  const key = numbers ? 'numberRanges' : 'modules';
+  const options = numbers ? NUMBER_RANGES.map(r => ({ id: r.id, label: `${r.from}–${r.to}` })) : MODULES.map((_, i) => ({ id: i + 1, label: i + 1 }));
+  for (const { id, label } of options) {
     const b = document.createElement('button');
     b.className = 'chip';
-    b.textContent = n;
-    b.setAttribute('aria-pressed', settings.modules.includes(n));
+    b.textContent = label;
+    b.setAttribute('aria-pressed', settings[key].includes(id));
     b.onclick = () => {
-      settings.modules = settings.modules.includes(n) ? settings.modules.filter(m => m !== n) : [...settings.modules, n].sort((a, b) => a - b);
+      settings[key] = settings[key].includes(id) ? settings[key].filter(m => m !== id) : [...settings[key], id].sort((a, b) => a - b);
       saveSettings();
     };
     chips.appendChild(b);
-  });
+  }
+  $('rangeTitle').textContent = numbers ? 'Numbers' : 'Modules';
+  $('mWords').setAttribute('aria-pressed', !numbers);
+  $('mNumbers').setAttribute('aria-pressed', numbers);
+  $('tIrregular').hidden = numbers;
+  $('tDecodable').hidden = numbers;
   $('tIrregular').setAttribute('aria-pressed', settings.irregular);
   $('tDecodable').setAttribute('aria-pressed', settings.decodable);
   $('tShow').setAttribute('aria-pressed', settings.showWord);
 
-  const pool = buildPool(settings.modules, settings);
-  $('poolInfo').textContent = pool.length ? `${pool.length} words to practice` : 'Pick at least one module and word type';
+  const pool = currentPool();
+  $('poolInfo').textContent = pool.length
+    ? `${pool.length} ${numbers ? 'numbers' : 'words'} to practice`
+    : numbers ? 'Pick at least one group of numbers' : 'Pick at least one module and word type';
   $('btnPlay').disabled = !pool.length;
   $('totalStars').textContent = totalStars;
 
@@ -547,8 +567,14 @@ $('btnResume').onclick = () => setPaused(false);
 $('btnSay').onclick = () => game.target && sayWord(game.target);
 $('btnLeft').onclick = () => setLane(game.lane - 1);
 $('btnRight').onclick = () => setLane(game.lane + 1);
-$('selAll').onclick = () => { settings.modules = MODULES.map((_, i) => i + 1); saveSettings(); };
-$('selNone').onclick = () => { settings.modules = []; saveSettings(); };
+$('selAll').onclick = () => {
+  if (isNumbers()) settings.numberRanges = NUMBER_RANGES.map(r => r.id);
+  else settings.modules = MODULES.map((_, i) => i + 1);
+  saveSettings();
+};
+$('selNone').onclick = () => { settings[isNumbers() ? 'numberRanges' : 'modules'] = []; saveSettings(); };
+$('mWords').onclick = () => { settings.mode = 'words'; saveSettings(); };
+$('mNumbers').onclick = () => { settings.mode = 'numbers'; saveSettings(); };
 $('tIrregular').onclick = () => { settings.irregular = !settings.irregular; saveSettings(); };
 $('tDecodable').onclick = () => { settings.decodable = !settings.decodable; saveSettings(); };
 $('tShow').onclick = () => { settings.showWord = !settings.showWord; saveSettings(); };

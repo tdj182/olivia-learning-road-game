@@ -55,22 +55,29 @@
   <div id="menu" hidden>
     <div class="card menu-card">
       <h1><span>Olivia's</span> Word Road</h1>
-      <p class="sub">Listen for the word, then drive into its sign!</p>
+      <p class="sub">Listen, then drive into the right sign!</p>
 
       <button id="btnPlay" class="big">Let's go! 🚚</button>
 
       <section>
-        <h3>Modules</h3>
+        <h3>Practice</h3>
+        <div class="chips">
+          <button class="chip" id="mWords" aria-pressed="true">🔤 Words</button>
+          <button class="chip" id="mNumbers" aria-pressed="false">🔢 Numbers</button>
+        </div>
+      </section>
+
+      <section>
+        <h3 id="rangeTitle">Modules</h3>
         <div id="moduleChips" class="chips"></div>
         <div class="row-links"><button id="selAll" class="link">All</button><button id="selNone" class="link">None</button></div>
       </section>
 
       <section>
-        <h3>Words</h3>
         <div class="chips">
           <button class="chip" id="tIrregular" aria-pressed="true">❤️ Irregular</button>
           <button class="chip" id="tDecodable" aria-pressed="true">🔤 Decodable</button>
-          <button class="chip" id="tShow" aria-pressed="true">👀 Show the word</button>
+          <button class="chip" id="tShow" aria-pressed="true">👀 Show it</button>
         </div>
         <p id="poolInfo" class="hint"></p>
       </section>

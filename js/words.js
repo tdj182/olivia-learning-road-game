@@ -13,6 +13,29 @@ export const MODULES = [
 
 export const ALL_WORDS = [...new Set(MODULES.flatMap(m => [...m.irregular, ...m.decodable]))];
 
+// Numbers 1-100 in groups of ten: range 1 = 1-10, range 10 = 91-100.
+export const NUMBER_RANGES = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, from: i * 10 + 1, to: i * 10 + 10 }));
+
+export function buildNumberPool(ranges) {
+  const nums = [];
+  for (const id of ranges) {
+    const r = NUMBER_RANGES[id - 1];
+    if (r) for (let n = r.from; n <= r.to; n++) nums.push(String(n));
+  }
+  return nums;
+}
+
+// Numbers kids mix up with the target: flipped digits, teen/ty pairs, one or ten away.
+export function confusableNumbers(target) {
+  const n = Number(target);
+  const out = [];
+  if (n >= 10) out.push(Number(String(n).split('').reverse().join('')));
+  if (n >= 13 && n <= 19) out.push((n - 10) * 10);
+  if (n >= 30 && n <= 90 && n % 10 === 0) out.push(n / 10 + 10);
+  out.push(n + 1, n - 1, n + 10, n - 10);
+  return [...new Set(out)].filter(x => x >= 1 && x <= 100 && x !== n).map(String);
+}
+
 // Unique words for the chosen modules (1-based) and word types.
 export function buildPool(modules, { irregular = true, decodable = true } = {}) {
   const words = [];

@@ -1,6 +1,6 @@
 # Olivia's Word Road
 
-A 3D driving game for practicing the HMH Into Reading kindergarten word list (Modules 1–9, irregular and decodable words).
+A 3D driving game for practicing the HMH Into Reading kindergarten word list (Modules 1–9, irregular and decodable words), plus numbers 1–100.
 
 The game says a word out loud. Steer the truck into the sign with that word.
 
@@ -8,7 +8,8 @@ The game says a word out loud. Steer the truck into the sign with that word.
 - **🔊** says the word again. **Space** pauses.
 - If Olivia picks a wrong sign, the game reads that word aloud and asks for the right one again. After two misses in a row, the right sign pulses as a hint.
 - Every 5 stars there is a celebration. Stars and the words Olivia finds hard are saved in the browser and show up on the start screen.
-- On the start screen you can pick modules and word types. Turn off "Show the word" to make it listening only.
+- On the start screen you can switch between **Words** and **Numbers**. For words, pick modules and word types. For numbers, pick groups of ten (1–10 … 91–100). One wrong sign is usually a look-alike number (17/71, 13/30, 46/47).
+- On the start screen you can also turn off "Show the word" to make it listening only.
 
 Plain HTML/JS with [three.js](https://threejs.org) from a CDN, so there is no build step. To run it locally: `python -m http.server`, then open http://localhost:8000.
 
