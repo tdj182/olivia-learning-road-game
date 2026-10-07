@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { MODULES, NUMBER_RANGES, buildPool, buildNumberPool } from './words.js';
 import { settings, saveSettings, stats, progress, SPEED_LEVELS } from './state.js';
 import { inventory } from './potions.js';
-import { updateParticles, hush } from './fx.js';
+import { updateParticles, hush, loadVoice } from './fx.js';
 import { createFlight, SHIPS } from './flight.js';
 import { createLab } from './lab.js';
 import { createBattle } from './battle.js';
@@ -119,6 +119,7 @@ function renderMenu() {
   $('tDecodable').setAttribute('aria-pressed', settings.decodable);
   $('tShow').setAttribute('aria-pressed', settings.showWord);
   $('tRocks').setAttribute('aria-pressed', settings.rocks);
+  $('tSpell').setAttribute('aria-pressed', settings.spell);
 
   const choiceChips = $('choiceChips');
   choiceChips.innerHTML = '';
@@ -189,6 +190,7 @@ $('tIrregular').onclick = () => { settings.irregular = !settings.irregular; upda
 $('tDecodable').onclick = () => { settings.decodable = !settings.decodable; update(); };
 $('tShow').onclick = () => { settings.showWord = !settings.showWord; update(); };
 $('tRocks').onclick = () => { settings.rocks = !settings.rocks; update(); };
+$('tSpell').onclick = () => { settings.spell = !settings.spell; update(); };
 for (const [id, d] of [['speedDown', -1], ['speedUp', 1], ['pauseSpeedDown', -1], ['pauseSpeedUp', 1]]) $(id).onclick = () => changeSpeed(d);
 
 canvas.addEventListener('pointerdown', e => {
@@ -201,7 +203,7 @@ window.addEventListener('pointerup', e => { if (mode === 'play') flight.onPointe
 
 window.addEventListener('keydown', e => {
   if (mode === 'play') {
-    if (e.key === ' ' || e.key === 'Escape' || e.key === 'p') setPaused(!flight.paused);
+    if (e.key === 'Escape' || e.key === 'p') setPaused(!flight.paused);
     else if (e.key === 'r') flight.sayTarget();
     else if (flight.onKey(e, true)) e.preventDefault();
     return;
@@ -240,7 +242,7 @@ function tick() {
 // ---------- Boot ----------
 (async () => {
   try {
-    await Promise.all([document.fonts.load('700 100px Andika'), flight.load()]);
+    await Promise.all([document.fonts.load('700 100px Andika'), flight.load(), loadVoice()]);
   } catch (err) {
     console.error(err);
     ui.loading.querySelector('p').textContent = 'Oh no, something did not load. Try refreshing!';

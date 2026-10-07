@@ -43,7 +43,9 @@
       <div id="streak" class="streak" hidden></div>
       <button id="bag" class="bag" aria-label="Potion Lab"><span>🧺</span><span id="bagCount">0</span><span class="go">🧪</span></button>
     </div>
-    <div id="flyHint" class="fly-hint">Touch and drag to fly! 👆</div>
+    <div id="stick" class="stick" aria-label="Joystick"><div class="knob"></div></div>
+    <button id="btnFire" class="fire-btn" aria-label="Fire">💥</button>
+    <div id="flyHint" class="fly-hint">🕹️ Steer · 💥 Blast rocks!</div>
     <div id="toast"></div>
     <div id="banner"></div>
   </div>
@@ -147,6 +149,9 @@
           <span class="speed-label">Words</span>
           <span id="choiceChips" class="chips"></span>
           <button class="chip" id="tRocks" aria-pressed="true">🪨 Space rocks</button>
+        </div>
+        <div class="chips spell-row">
+          <button class="chip" id="tSpell" aria-pressed="false">✏️ Spell it (hard)</button>
         </div>
       </section>
 

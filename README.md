@@ -4,10 +4,11 @@ A 3D space-flying game for practicing the HMH Into Reading kindergarten word lis
 
 The game says a word out loud. Fly the spaceship through the ring with that word.
 
-- **Fly:** touch and drag anywhere (the ship flies toward your finger), or use the arrow keys / WASD. Rings can be high or low, so she has to steer up and down as well as left and right.
-- **🔊** (or **R**) says the word again. **Space** pauses.
+- **Fly:** the joystick in the bottom-left corner (or touch and drag anywhere, or the arrow keys / WASD). Rings can be high or low, so she has to steer up and down as well as left and right.
+- **💥 Fire** (bottom-right, or **Space**): lasers that blow up space rocks. Hold it down to keep firing.
+- **🔊** (or **R**) says the word again. **P** or **Esc** pauses.
 - If she flies through a wrong ring, the game reads that word aloud and asks for the right one again. Flying past every ring counts as a miss too. After two misses in a row, the right ring pulses as a hint.
-- **Space rocks 🪨** drift in between rings. Hitting one breaks the streak. Some rocks aim right at where the ship is, so she has to dodge. **Bonus gems 💎** give an extra ingredient.
+- **Space rocks 🪨** drift in between rings. Hitting one breaks the streak. Some rocks aim right at where the ship is, so she has to dodge them or blast them. **Bonus gems 💎** give an extra ingredient.
 - Answers in a row build a streak 🔥. Each one also speeds things up a little, up to +30%.
 - Every 5 stars there is a celebration. Stars and the words she finds hard are saved in the browser and show up on the start screen.
 
@@ -16,6 +17,7 @@ The game says a word out loud. Fly the spaceship through the ring with that word
 - **Speed 1–10** (🐢/🐇). It can also be changed on the pause card mid-game. Level 5 is the default and is already faster than the old truck. The base speed is the `BASE_SPEED` constant at the top of `js/flight.js`.
 - **Words 3 / 4 / 5:** how many rings per round.
 - **Space rocks** on or off.
+- **✏️ Spell it (hard):** instead of finding the whole word, she spells it. Each ring has a letter, and she flies through the letters in order. The word at the top fills in as she goes. A wrong letter is read aloud ("Oops! That's n. Try again!") and that letter comes around again. Wrong choices are look-alike letters (b/d/p, m/n, i/l). Turn off **Show it** too, and she has to spell from listening alone.
 - **Spaceship:** 🐝 🦩 🐸 🦊.
 - **Words / Numbers**, modules or number groups, word types, and **Show it** (turn it off for listening only), same as before.
 
@@ -37,6 +39,19 @@ The game says a word out loud. Fly the spaceship through the ring with that word
 3. **Monster Battle ⚔️.** Monsters march down a long path toward the wall. Tap a monster to zap it with the free **wand 🪄** (weak, with a short cooldown). Pick a potion in the bar for a big attack; after each throw it switches back to the wand. Monsters have health bars and get tougher every wave. There are 5 waves, and the last one has a **dragon boss**. Each monster that reaches the wall costs a heart (the dragon costs 3). Losing all 5 hearts ends the battle.
 
 Ingredients only come from reading, so the fun modes always lead back to learning. A potion is needed to start a battle. Existing saves were converted, and everyone gets a one-time gift of 2 bottles of each new potion.
+
+## Voice
+
+Everything the game says is recorded ahead of time with [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0), a natural-sounding neural voice (af_bella), and saved in `assets/voice/` (about 2 MB). It plays offline. If a clip is missing, the browser's built-in voice says that line instead.
+
+All spoken text lives in `js/lines.js`. After adding or changing a line or word, re-record and refresh the offline list:
+
+```
+uv run --python 3.12 --with "kokoro>=0.9.4" --with "transformers>=4.45" --with soundfile python tools/voice/generate.py
+node tools/build-sw.mjs
+```
+
+`--only "<regex>"` re-records only the matching lines, and `--voice` picks another Kokoro voice. Words that came out unclear have pronunciation fixes in `SAY_AS` at the top of `tools/voice/generate.py`. These were checked with Whisper speech recognition: "she" is still a little soft. "live" has one recording, said "liv".
 
 ## Offline and home screen
 
@@ -60,6 +75,8 @@ Plain HTML/JS with [three.js](https://threejs.org) copied into `vendor/`, so the
 - `js/potions.js`: ingredients, elements, brewing
 - `js/words.js`: the word lists
 - `js/state.js`: saved settings and stats
+- `js/lines.js`: everything the game says (the voice recorder reads it too)
+- `tools/voice/`: records the voice clips
 - `js/fx.js`: shared sounds, speech, particles
 - `tools/icon.html` draws the app icons.
 

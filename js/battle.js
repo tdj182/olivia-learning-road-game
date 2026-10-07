@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { inventory, makeBottle, bottleSvg, ELEMENTS, RAINBOW } from './potions.js';
 import { store } from './state.js';
+import { LINES, waveLine } from './lines.js';
 import { loadModel, normalize, burst, sfx, say, floatText, toScreen } from './fx.js';
 
 // ---------- Tuning ----------
@@ -193,7 +194,7 @@ export function createBattle({ onExit }) {
     if (tpl.boss) {
       sfx.roar();
       showBanner('🐉 The Dragon is coming! 🐉');
-      say([['Uh oh! Here comes the dragon! Use your best potions!', 1]], { interrupt: false });
+      say([LINES.dragon], { interrupt: false });
     }
     return m;
   }
@@ -239,7 +240,7 @@ export function createBattle({ onExit }) {
     sfx.die();
     if (m.tpl.boss) {
       burst(center(m), 120, RAINBOW, scene, 1.6);
-      say([['You beat the dragon!', 1]]);
+      say([LINES.beatDragon]);
     }
   }
 
@@ -455,7 +456,7 @@ export function createBattle({ onExit }) {
       b.setAttribute('aria-pressed', p.name === selected);
       b.setAttribute('aria-label', `${p.name}, ${p.count} left`);
       b.innerHTML = `${bottleSvg(p, 46)}<span class="el">${ELEMENTS[p.element].emoji}</span><span class="n">${p.count}</span>${p.mega ? '<span class="mega">MEGA</span>' : ''}`;
-      b.onclick = () => { selected = p.name; renderBar(); say([[p.name, 1]]); };
+      b.onclick = () => { selected = p.name; renderBar(); say([p.name]); };
       el.bar.appendChild(b);
     }
   }
@@ -481,7 +482,7 @@ export function createBattle({ onExit }) {
     phase = 'fight';
     el.wave.textContent = `Wave ${i + 1}/${WAVES.length}`;
     showBanner(i === WAVES.length - 1 ? `Last wave!` : `Wave ${i + 1}!`);
-    say([[i === WAVES.length - 1 ? 'Last wave! Get ready!' : `Wave ${i + 1}!`, 1]], { interrupt: false });
+    say([i === WAVES.length - 1 ? LINES.lastWave : waveLine(i + 1)], { interrupt: false });
   }
 
   function loseHeart(n) {
@@ -502,11 +503,11 @@ export function createBattle({ onExit }) {
     if (won) {
       el.endText.innerHTML = 'You beat the Dragon! 🏆';
       sfx.fanfare();
-      say([['You did it! You beat all the monsters and the dragon!', 0.95]]);
+      say([LINES.won]);
     } else {
       el.endText.innerHTML = 'The monsters got through! 😱';
       sfx.lose();
-      say([['Oh no! The monsters got through. Make more potions and try again!', 0.95]]);
+      say([LINES.lost]);
     }
     el.endSub.innerHTML = `Monsters defeated: <b>${kills}</b> · Best: <b>${best}</b>`;
     el.end.hidden = false;
@@ -536,7 +537,7 @@ export function createBattle({ onExit }) {
     phase = 'intro';
     phaseT = 0;
     el.hint.classList.add('show');
-    say([['Monsters are coming! Tap them to zap them with your wand. Pick a potion for a super attack!', 1]]);
+    say([LINES.battleIntro]);
   }
 
   $('btnBattleHome').onclick = () => onExit('menu');

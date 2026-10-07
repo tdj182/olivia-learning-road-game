@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { INGREDIENTS, ELEMENTS, RAINBOW, BOTTLES_PER_BREW, inventory, ingredientById, brew, makeBottle, bottleSvg } from './potions.js';
+import { withArticle } from './ingredients.js';
+import { LINES } from './lines.js';
 import { loadModel, normalize, burst, say, sfx, flyEmoji, toScreen } from './fx.js';
 
 const STIR_TURNS = 3; // full circles of stirring to finish a potion
@@ -180,7 +182,7 @@ export function createLab({ onExit, onBattle }) {
     drag = { ing, ghost, button, sx: e.clientX, sy: e.clientY, moved: false, over: false, id: e.pointerId };
     moveGhost(e.clientX, e.clientY);
     button.classList.add('lifted');
-    say([[ing.name, 1]]);
+    say([ing.name]);
   }
 
   function moveGhost(x, y) {
@@ -215,7 +217,7 @@ export function createLab({ onExit, onBattle }) {
         anim.onfinish = () => d.ghost.remove();
         if (!d.moved) {
           el.msg.textContent = 'Drag it into the pot! 👆';
-          say([['Drag it into the pot!', 1]], { interrupt: false });
+          say([LINES.dragIt], { interrupt: false });
         }
       }
       return;
@@ -236,8 +238,8 @@ export function createLab({ onExit, onBattle }) {
       for (let i = 0; i < 6; i++) spawnBubble(true);
       if (full()) {
         const p = brew(slots);
-        el.msg.innerHTML = `${bottleSvg(p, 34)}<span>This makes a <b>${p.name}</b>! Now stir it! 🥄</span>`;
-        say([[`This makes a ${p.name}! Now stir it round and round!`, 1]]);
+        el.msg.innerHTML = `${bottleSvg(p, 34)}<span>This makes ${withArticle(p.name).split(' ')[0]} <b>${p.name}</b>! Now stir it! 🥄</span>`;
+        say([LINES.thisMakes, withArticle(p.name), LINES.stirIt]);
       } else {
         el.msg.textContent = `${3 - slots.length} more!`;
       }
@@ -307,7 +309,7 @@ export function createLab({ onExit, onBattle }) {
     sfx.brew();
     setTimeout(sfx.fanfare, 600);
     el.msg.innerHTML = `${bottleSvg(potion, 40)}<span>You made ${BOTTLES_PER_BREW} <b>${potion.name}s</b>!</span>`;
-    say([[`You made ${BOTTLES_PER_BREW} ${potion.name}s!`, 0.95]]);
+    say([LINES.youMade, `${potion.name}s!`]); // LINES.youMade says "three" (BOTTLES_PER_BREW)
     render();
   }
 
@@ -352,7 +354,7 @@ export function createLab({ onExit, onBattle }) {
       active = true;
       renderShelf();
       render();
-      say([['Welcome to the potion lab! Drag 3 things into the pot.', 1]]);
+      say([LINES.labWelcome]);
     },
     exit() {
       active = false;

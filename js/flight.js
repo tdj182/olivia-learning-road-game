@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { ALL_WORDS, confusableNumbers } from './words.js';
 import { settings, stats, saveStats, progress } from './state.js';
 import { inventory } from './potions.js';
-import { loadModel, normalize, burst, sfx, say, sayWord, hush, flyEmoji, floatText, toScreen } from './fx.js';
+import { LINES, PRAISE, letterLine } from './lines.js';
+import { loadModel, normalize, burst, sfx, say, sayWord, hush, preloadVoice, flyEmoji, floatText, toScreen } from './fx.js';
 
 // ---------- Tuning ----------
 // BASE_SPEED is how fast space flies by at speed level 5 (the Speed setting on the start
@@ -11,6 +12,7 @@ export const BASE_SPEED = 16;
 export const speedFactor = level => 0.4 + level * 0.12;
 const STREAK_BOOST = 0.03;      // each right answer in a row adds 3% speed (up to 10 in a row)
 const SPAWN_Z = -105;           // where word rings appear
+const LETTER_SPAWN_Z = -75;     // Spell it mode: letter rings come closer together
 const NEAR_Z = 14;              // things behind the camera get removed
 const STAR_SPAN = 220;
 const AREA = { x: 4.4, yMin: 0.8, yMax: 4.4 }; // where the ship can fly
@@ -21,7 +23,13 @@ const GEM_RADIUS = 1.4;
 const NEXT_ROUND_DELAY = 1.1;
 const CELEBRATE_EVERY = 5;
 const RING_COLORS = ['#ff6fa8', '#ffb627', '#3fa7ff', '#38c172', '#b57cff'];
-const PRAISE = ['Great job!', 'You got it!', 'Awesome!', 'Super reading!', 'Yes!', 'Way to go!', 'Wonderful!'];
+const LASER_SPEED = 70;
+const LASER_COOLDOWN = 0.22;
+// Letters that get mixed up, used as wrong choices in Spell it mode.
+const LOOKALIKE = {
+  b: 'dpq', d: 'bpq', p: 'bdq', q: 'bdp', m: 'nw', n: 'mhu', w: 'mv', u: 'nv', v: 'uwy', i: 'lj', l: 'it', t: 'lf', f: 't',
+  h: 'nk', a: 'oe', e: 'ac', o: 'ac', c: 'eo', s: 'zc', z: 's', g: 'qj', j: 'ig', y: 'vg', k: 'hx', x: 'k', r: 'n',
+};
 
 export const SHIPS = [
   { file: 'Spaceship_BarbaraTheBee', icon: '🐝', name: 'Barbara the Bee' },
@@ -38,7 +46,8 @@ export function createFlight({ renderer }) {
   const ui = {
     hud: $('hud'), targetWord: $('targetWord'), starCount: $('starCount'), stars: $('stars'),
     toast: $('toast'), banner: $('banner'), bag: $('bag'), bagCount: $('bagCount'),
-    streak: $('streak'), hint: $('flyHint'),
+    streak: $('streak'), hint: $('flyHint'), label: document.querySelector('#target .label'),
+    stick: $('stick'), knob: document.querySelector('#stick .knob'), fire: $('btnFire'),
   };
 
   // ---------- Scene ----------
@@ -190,7 +199,11 @@ export function createFlight({ renderer }) {
     paused: false,
     pool: [],
     target: null,
-    gate: null,            // { group, portals, evaluated, reminded, hint }
+    gate: null,            // { group, portals, answer, kind: 'word' | 'letter', evaluated, reminded, hint }
+    spelling: false,       // Spell it mode: partway through a word
+    spellAt: 0,
+    wordMissed: false,
+    missesThisLetter: 0,
     nextRoundIn: 0,
     retry: null,
     missesThisWord: 0,
@@ -208,6 +221,10 @@ export function createFlight({ renderer }) {
   const aim = new THREE.Vector2(0, 2.2);
   const keys = new Set();
   let pointerDown = false;
+  const stick = { x: 0, y: 0, active: false, id: null };
+  let firing = false;
+  let fireCd = 0;
+  const lasers = [];
 
   const worldSpeed = () => BASE_SPEED * speedFactor(settings.speed) * (1 + Math.min(game.streak, 10) * STREAK_BOOST);
 
@@ -239,27 +256,89 @@ export function createFlight({ renderer }) {
     return [...fromPool, ...extra].slice(0, k);
   }
 
-  function startRound() {
-    const target = pickTarget();
-    game.target = target;
-    game.lastTarget = target;
-    const n = Math.max(3, Math.min(5, settings.choices));
-    const words = [target, ...pickDistractors(target, n - 1)].sort(() => Math.random() - 0.5);
-    const spots = layout(words.length);
+  function spawnGate(labels, answer, kind, z) {
+    const spots = layout(labels.length);
     const group = new THREE.Group();
-    const portals = words.map((w, i) => {
+    const portals = labels.map((w, i) => {
       const p = makePortal(w, RING_COLORS[i % RING_COLORS.length]);
       p.position.set(spots[i][0], spots[i][1], 0);
       group.add(p);
       return p;
     });
-    group.position.z = SPAWN_Z;
+    group.position.z = z;
     scene.add(group);
-    game.gate = { group, portals, evaluated: false, reminded: false, hint: game.missesThisWord >= 2 };
+    const misses = kind === 'letter' ? game.missesThisLetter : game.missesThisWord;
+    game.gate = { group, portals, answer, kind, evaluated: false, reminded: kind === 'letter', hint: misses >= 2 };
+  }
 
+  const choiceCount = () => Math.max(3, Math.min(5, settings.choices));
+
+  function startRound() {
+    const target = pickTarget();
+    game.target = target;
+    game.lastTarget = target;
+    ui.label.textContent = settings.spell ? 'Spell' : 'Find';
+    if (settings.spell) {
+      game.spelling = true;
+      game.spellAt = 0;
+      game.wordMissed = false;
+      game.missesThisLetter = 0;
+      renderSpell();
+      spawnLetterGate();
+      say([LINES.spell, target]);
+      return;
+    }
+    const words = [target, ...pickDistractors(target, choiceCount() - 1)].sort(() => Math.random() - 0.5);
+    spawnGate(words, target, 'word', SPAWN_Z);
     ui.targetWord.textContent = settings.showWord ? target : '? ? ?';
     ui.targetWord.classList.toggle('hidden-word', !settings.showWord);
-    say([['Find', 0.9], [target, 0.7]]);
+    say([LINES.find, target]);
+  }
+
+  // ---------- Spell it mode ----------
+  function letterChoices(ch, n) {
+    const digit = /\d/.test(ch);
+    const lower = ch.toLowerCase();
+    const pool = digit ? '0123456789' : 'abcdefghijklmnopqrstuvwxyz';
+    const shuffle = a => a.sort(() => Math.random() - 0.5);
+    const near = shuffle([...(LOOKALIKE[lower] ?? '')]);
+    const rest = shuffle([...pool].filter(c => c !== lower && !near.includes(c)));
+    const upper = !digit && ch !== lower;
+    const wrong = [...near, ...rest].slice(0, n - 1).map(c => (upper ? c.toUpperCase() : c));
+    return shuffle([ch, ...wrong]);
+  }
+
+  function spawnLetterGate() {
+    const ch = game.target[game.spellAt];
+    spawnGate(letterChoices(ch, choiceCount()), ch, 'letter', LETTER_SPAWN_Z);
+  }
+
+  function renderSpell() {
+    const show = settings.showWord;
+    ui.targetWord.classList.remove('hidden-word');
+    ui.targetWord.innerHTML = [...game.target].map((c, i) => {
+      if (i < game.spellAt) return `<span class="sp done">${c}</span>`;
+      return `<span class="sp ${i === game.spellAt ? 'cur' : 'todo'}">${show ? c : '_'}</span>`;
+    }).join('');
+  }
+
+  function rightAnswer(chosen, word, sayParts) {
+    game.retry = null;
+    game.missesThisWord = 0;
+    game.sessionStars++;
+    progress.addStar();
+    setStreak(game.streak + 1);
+    ui.starCount.textContent = game.sessionStars;
+    bump(ui.stars);
+    const p = chosen.getWorldPosition(new THREE.Vector3());
+    burst(p, 50, undefined, scene);
+    awardIngredient(p);
+    sfx.good();
+    const streak = game.streak >= 3;
+    const praise = streak ? `${game.streak} in a row!` : PRAISE[Math.floor(Math.random() * PRAISE.length)];
+    showToast(`${praise} <b>${word}</b>`, 'good');
+    say(sayParts(streak ? [String(game.streak), LINES.inARow] : [praise]));
+    if (game.sessionStars % CELEBRATE_EVERY === 0) setTimeout(celebrate, 1400);
   }
 
   function evaluateGate() {
@@ -271,56 +350,92 @@ export function createFlight({ renderer }) {
       const d = Math.hypot(p.position.x - ship.position.x, p.position.y - ship.position.y);
       if (d < best) { best = d; chosen = p; }
     }
-    const word = game.target;
+    if (chosen) chosen.userData.pop = 0;
+    for (const p of gate.portals) if (p !== chosen) p.userData.fade = 0;
+    if (gate.kind === 'letter') evaluateLetter(gate, chosen);
+    else evaluateWord(chosen);
+  }
 
+  // A wrong ring turns gray and shrinks away instead of popping.
+  function markWrong(chosen) {
+    delete chosen.userData.pop;
+    chosen.userData.fade = 0;
+    chosen.userData.ring.material.color.set('#777');
+    setStreak(0);
+    shake = 0.35;
+    sfx.oops();
+  }
+
+  function evaluateWord(chosen) {
+    const word = game.target;
     if (!chosen) {
       game.retry = word;
       game.missesThisWord++;
       setStreak(0);
       sfx.oops();
       showToast(`Whoops! Fly <b>through</b> a ring!`, 'oops');
-      say([['Whoops! Fly through the ring that says', 0.95], [word, 0.7]]);
-      for (const p of gate.portals) p.userData.fade = 0;
+      say([LINES.missedRing, word]);
       game.nextRoundIn = NEXT_ROUND_DELAY + 1.4;
       return;
     }
-
     const s = (stats[word] ??= { c: 0, m: 0 });
     const right = chosen.userData.word === word;
     if (right) {
       s.c++;
-      game.retry = null;
-      game.missesThisWord = 0;
-      game.sessionStars++;
-      progress.addStar();
-      setStreak(game.streak + 1);
-      ui.starCount.textContent = game.sessionStars;
-      bump(ui.stars);
-
-      const p = chosen.getWorldPosition(new THREE.Vector3());
-      burst(p, 50, undefined, scene);
-      awardIngredient(p);
-      chosen.userData.pop = 0;
-      for (const o of gate.portals) if (o !== chosen) o.userData.fade = 0;
-      sfx.good();
-      const praise = game.streak >= 3 ? `${game.streak} in a row!` : PRAISE[Math.floor(Math.random() * PRAISE.length)];
-      showToast(`${praise} <b>${word}</b>`, 'good');
-      say([[praise, 1], [word, 0.75]]);
-      if (game.sessionStars % CELEBRATE_EVERY === 0) setTimeout(celebrate, 900);
+      rightAnswer(chosen, word, praise => [...praise, word]);
     } else {
       s.m++;
       game.retry = word;
       game.missesThisWord++;
-      setStreak(0);
-      shake = 0.35;
-      chosen.userData.ring.material.color.set('#777');
-      for (const o of gate.portals) o.userData.fade = 0;
-      sfx.oops();
+      markWrong(chosen);
       showToast(`Oops! That says <b>${chosen.userData.word}</b>`, 'oops');
-      say([['Oops! That says', 0.95], [chosen.userData.word, 0.75], ["Let's find", 0.95], [word, 0.7], ['again!', 0.95]]);
+      say([LINES.oopsSays, chosen.userData.word, LINES.letsFind, word, LINES.again]);
     }
     saveStats();
     game.nextRoundIn = NEXT_ROUND_DELAY + (right ? 0.5 : 2.2);
+  }
+
+  function evaluateLetter(gate, chosen) {
+    const word = game.target;
+    if (!chosen) {
+      game.missesThisLetter++;
+      setStreak(0);
+      sfx.oops();
+      showToast(`Whoops! Fly <b>through</b> a letter!`, 'oops');
+      say([LINES.missedLetter, LINES.spell, word]);
+      game.nextRoundIn = 1.4;
+      return;
+    }
+    const ch = chosen.userData.word;
+    if (ch !== gate.answer) {
+      if (!game.wordMissed) {
+        game.wordMissed = true;
+        (stats[word] ??= { c: 0, m: 0 }).m++;
+        saveStats();
+      }
+      game.missesThisLetter++;
+      markWrong(chosen);
+      showToast(`Oops! That's <b>${ch}</b>`, 'oops');
+      say([LINES.thatsLetter, letterLine(ch), LINES.tryAgain]);
+      game.nextRoundIn = 1.8;
+      return;
+    }
+    game.spellAt++;
+    game.missesThisLetter = 0;
+    renderSpell();
+    if (game.spellAt < word.length) {
+      sfx.letter();
+      burst(chosen.getWorldPosition(new THREE.Vector3()), 20, undefined, scene, 0.6);
+      say([letterLine(ch)]);
+      game.nextRoundIn = 0.3;
+      return;
+    }
+    // The whole word is spelled.
+    game.spelling = false;
+    if (!game.wordMissed) (stats[word] ??= { c: 0, m: 0 }).c++;
+    saveStats();
+    rightAnswer(chosen, word, praise => [letterLine(ch), LINES.youSpelled, word, ...praise]);
+    game.nextRoundIn = NEXT_ROUND_DELAY + 1.2;
   }
 
   function setStreak(n) {
@@ -338,10 +453,10 @@ export function createFlight({ renderer }) {
     if (!game.playing) return;
     burst(ship.position.clone().add(new THREE.Vector3(0, 1, -2)), 90, undefined, scene);
     sfx.fanfare();
-    const cheer = settings.mode === 'numbers' ? 'Great counting, Olivia!' : 'Great reading, Olivia!';
+    const cheer = settings.mode === 'numbers' ? LINES.cheerNumbers : LINES.cheerWords;
     ui.banner.innerHTML = `⭐ ${game.sessionStars} stars! ⭐<br>${cheer}`;
     ui.banner.classList.add('show');
-    say([[`${game.sessionStars} stars! ${cheer}`, 0.95]], { interrupt: false });
+    say([String(game.sessionStars), LINES.stars, cheer], { interrupt: false });
     setTimeout(() => ui.banner.classList.remove('show'), 2600);
   }
 
@@ -412,7 +527,7 @@ export function createFlight({ renderer }) {
     ship.userData.spin = 1;
     const s = toScreen(ship.position, camera);
     floatText('Bonk! 💥', s.x, s.y - 40, 'bad');
-    if (game.bonks <= 2) say([['Bonk! Watch out for space rocks!', 1]], { interrupt: false });
+    if (game.bonks <= 2) say([LINES.bonk], { interrupt: false });
   }
 
   function collectGem(g) {
@@ -432,6 +547,84 @@ export function createFlight({ renderer }) {
     rocks.length = gems.length = 0;
   }
 
+  // ---------- Lasers ----------
+  const laserGeo = new THREE.BoxGeometry(0.13, 0.13, 1.6);
+  const laserMat = new THREE.MeshBasicMaterial({ color: '#7ff6ff', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  let laserSide = 1;
+
+  function fire() {
+    if (!game.playing || game.paused || fireCd > 0 || !ship) return;
+    fireCd = LASER_COOLDOWN;
+    laserSide = -laserSide;
+    const m = new THREE.Mesh(laserGeo, laserMat);
+    m.position.set(ship.position.x + laserSide * 0.45, ship.position.y, ship.position.z - 0.9);
+    scene.add(m);
+    lasers.push(m);
+    sfx.laser();
+    if (!game.steered) { game.steered = true; ui.hint.classList.remove('show'); }
+  }
+
+  function blowUp(rock) {
+    sfx.boom();
+    const c = rock.position.clone().add(new THREE.Vector3(0, 0.8, 0));
+    burst(c, 40, ['#8a7f99', '#b9aec8', '#ff9f43', '#ffd23f'], scene, 1.1, 4);
+    scene.remove(rock);
+    rocks.splice(rocks.indexOf(rock), 1);
+    const s = toScreen(c, camera);
+    floatText('Boom! 💥', s.x, s.y - 30, 'good');
+  }
+
+  function updateLasers(dt) {
+    for (let i = lasers.length - 1; i >= 0; i--) {
+      const m = lasers[i];
+      m.position.z -= LASER_SPEED * dt;
+      const hit = rocks.find(r => !r.userData.passed
+        && Math.abs(r.position.z - m.position.z) < 1.6
+        && Math.hypot(r.position.x - m.position.x, r.position.y + 0.8 - m.position.y) < 1.1);
+      if (hit) blowUp(hit);
+      if (hit || m.position.z < SPAWN_Z) { scene.remove(m); lasers.splice(i, 1); }
+    }
+  }
+
+  // ---------- Joystick and fire button ----------
+  function stickMove(e) {
+    const r = ui.stick.getBoundingClientRect();
+    const max = r.width / 2 - 20;
+    let dx = e.clientX - (r.left + r.width / 2);
+    let dy = e.clientY - (r.top + r.height / 2);
+    const len = Math.hypot(dx, dy);
+    if (len > max) { dx *= max / len; dy *= max / len; }
+    ui.knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    stick.x = dx / max;
+    stick.y = -dy / max;
+  }
+  function stickEnd(e) {
+    if (e.pointerId !== stick.id) return;
+    stick.active = false;
+    stick.id = null;
+    stick.x = stick.y = 0;
+    ui.knob.style.transform = '';
+    if (ship) aim.set(ship.position.x, ship.position.y); // let go: stop
+  }
+  ui.stick.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    ui.stick.setPointerCapture(e.pointerId);
+    stick.active = true;
+    stick.id = e.pointerId;
+    stickMove(e);
+    if (!game.steered) { game.steered = true; ui.hint.classList.remove('show'); }
+  });
+  ui.stick.addEventListener('pointermove', e => { if (e.pointerId === stick.id) stickMove(e); });
+  ui.stick.addEventListener('pointerup', stickEnd);
+  ui.stick.addEventListener('pointercancel', stickEnd);
+  ui.fire.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    ui.fire.setPointerCapture(e.pointerId);
+    firing = true;
+    fire();
+  });
+  for (const ev of ['pointerup', 'pointercancel']) ui.fire.addEventListener(ev, () => { firing = false; });
+
   // ---------- Input ----------
   const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
   const ray = new THREE.Raycaster();
@@ -449,6 +642,8 @@ export function createFlight({ renderer }) {
     if (!game.playing) {
       // Menu: cruise around on its own.
       aim.set(Math.sin(t * 0.5) * 2.5, 2.4 + Math.sin(t * 0.8) * 0.8);
+    } else if (stick.active) {
+      aim.set(THREE.MathUtils.clamp(ship.position.x + stick.x * 2.2, -AREA.x, AREA.x), THREE.MathUtils.clamp(ship.position.y + stick.y * 2.2, AREA.yMin, AREA.yMax));
     } else if (keys.size) {
       const kx = (keys.has('right') ? 1 : 0) - (keys.has('left') ? 1 : 0);
       const ky = (keys.has('up') ? 1 : 0) - (keys.has('down') ? 1 : 0);
@@ -528,6 +723,10 @@ export function createFlight({ renderer }) {
 
     if (!game.playing) return;
 
+    fireCd -= dt;
+    if (firing || keys.has('fire')) fire();
+    updateLasers(dt);
+
     // Word rings
     const gate = game.gate;
     if (gate) {
@@ -535,7 +734,7 @@ export function createFlight({ renderer }) {
       const z = gate.group.position.z;
       for (const p of gate.portals) p.userData.ring.rotation.z += dt * 0.8;
       if (gate.hint && !gate.evaluated) {
-        const p = gate.portals.find(o => o.userData.word === game.target);
+        const p = gate.portals.find(o => o.userData.word === gate.answer);
         p.scale.setScalar(1 + Math.sin(t * 8) * 0.08);
       }
       if (!gate.reminded && z > SPAWN_Z / 2) {
@@ -560,7 +759,8 @@ export function createFlight({ renderer }) {
       const rockClose = rocks.some(r => r.position.z < SPAWN_Z + 14);
       if (game.nextRoundIn <= 0 && !rockClose) {
         clearGate();
-        startRound();
+        if (game.spelling && settings.spell) spawnLetterGate();
+        else startRound();
       }
     }
 
@@ -615,6 +815,7 @@ export function createFlight({ renderer }) {
       game.missesThisWord = 0;
       game.bonks = 0;
       game.steered = false;
+      game.spelling = false;
       setStreak(0);
       clearGate();
       clearObstacles();
@@ -627,13 +828,18 @@ export function createFlight({ renderer }) {
       rockIn = 4;
       gemIn = 8;
       aim.set(0, 2.2);
-      say([['Blast off, Olivia!', 1]]);
+      say([LINES.blastOff]);
+      preloadVoice([LINES.find, LINES.spell, LINES.inARow, LINES.youSpelled, ...PRAISE, ...pool, ...new Set(pool.flatMap(w => [...w].map(letterLine)))]);
     },
     stop() {
       game.playing = false;
       game.paused = false;
+      game.spelling = false;
       clearGate();
       clearObstacles();
+      for (const m of lasers) scene.remove(m);
+      lasers.length = 0;
+      firing = false;
       keys.clear();
       ui.hud.hidden = true;
       ui.hint.classList.remove('show');
@@ -655,10 +861,11 @@ export function createFlight({ renderer }) {
     },
     onPointerUp() { pointerDown = false; },
     onKey(e, down) {
-      const k = { ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right', ArrowUp: 'up', w: 'up', ArrowDown: 'down', s: 'down' }[e.key];
+      const k = { ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right', ArrowUp: 'up', w: 'up', ArrowDown: 'down', s: 'down', ' ': 'fire' }[e.key];
       if (!k) return false;
       if (down) keys.add(k); else keys.delete(k);
       if (!game.steered && down) { game.steered = true; ui.hint.classList.remove('show'); }
+      if (!down && k !== 'fire' && ![...keys].some(x => x !== 'fire') && ship) aim.set(ship.position.x, ship.position.y);
       return true;
     },
     resize(aspect) {

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { voiceKey } from './lines.js';
 
 // Shared helpers: model loading, particles, sounds, speech, flying emoji.
 
@@ -151,6 +152,9 @@ export const sfx = {
   stir: () => tone(170 + Math.random() * 90, 0, 0.14, 'sine', 0.14),
   whoosh: () => [700, 600, 500, 420].forEach((f, i) => tone(f, i * 0.04, 0.08, 'sine', 0.06)),
   chirp: () => [880, 1175, 1568].forEach((f, i) => tone(f, i * 0.07, 0.14, 'sine', 0.08)),
+  boom: () => { noise(0, 0.45, 0.35, 1200); sweep(220, 50, 0, 0.4, 'square', 0.08); },
+  laser: () => sweep(1800, 600, 0, 0.1, 'square', 0.04),
+  letter: () => [784, 1047].forEach((f, i) => tone(f, i * 0.06, 0.15, 'triangle', 0.12)),
   bonk: () => { tone(110, 0, 0.25, 'square', 0.1); noise(0, 0.25, 0.3, 700); },
   pew: () => sweep(1500, 420, 0, 0.16, 'triangle', 0.09),
   hit: () => { noise(0, 0.08, 0.18, 2500); tone(260, 0, 0.08, 'square', 0.05); },
@@ -167,11 +171,72 @@ export const sfx = {
 };
 
 // ---------- Speech ----------
+// Recorded clips (assets/voice, made by tools/voice/generate.py) play back to back.
+// If any clip for a line is missing, the browser's built-in voice says it instead.
+let clipIndex = null;
+const clipBuffers = new Map();
+const clipSources = new Set();
+let clipQueueEnd = 0;
+let clipGen = 0;
+const CLIP_GAP = 0.12; // seconds between parts
+const warned = new Set();
+
+export async function loadVoice() {
+  try {
+    clipIndex = await (await fetch('assets/voice/index.json')).json();
+  } catch (err) {
+    console.warn('Voice clips unavailable, using the built-in voice', err);
+  }
+}
+
+function clipBuffer(key) {
+  if (!clipBuffers.has(key)) {
+    const p = fetch(`assets/voice/${clipIndex[key]}`)
+      .then(r => r.arrayBuffer())
+      .then(b => audio().decodeAudioData(b));
+    p.catch(() => clipBuffers.delete(key));
+    clipBuffers.set(key, p);
+  }
+  return clipBuffers.get(key);
+}
+
+// Decode clips ahead of time so they play without a delay.
+export function preloadVoice(texts) {
+  if (!clipIndex) return;
+  for (const t of texts) { const k = voiceKey(t); if (clipIndex[k]) clipBuffer(k).catch(() => {}); }
+}
+
+function stopClips() {
+  clipGen++;
+  for (const s of clipSources) { try { s.stop(); } catch { /* already stopped */ } }
+  clipSources.clear();
+  clipQueueEnd = 0;
+}
+
+async function playClips(keys, interrupt) {
+  const gen = clipGen;
+  const buffers = await Promise.all(keys.map(clipBuffer));
+  if (gen !== clipGen) return; // interrupted while loading
+  const a = audio();
+  let t = Math.max(a.currentTime + 0.03, interrupt ? 0 : clipQueueEnd);
+  for (const b of buffers) {
+    const src = a.createBufferSource();
+    src.buffer = b;
+    src.connect(a.destination);
+    src.start(t);
+    src.onended = () => clipSources.delete(src);
+    clipSources.add(src);
+    t += b.duration + CLIP_GAP;
+  }
+  clipQueueEnd = t;
+}
+
 let voice = null;
 let offlineVoice = null; // an on-device voice, for when there's no internet
 function pickVoice() {
   const vs = window.speechSynthesis?.getVoices() ?? [];
-  const best = list => list.find(v => /samantha|aria|jenny|zira|google us english|female/i.test(v.name))
+  const best = list => list.find(v => /natural|neural|enhanced|premium/i.test(v.name))
+    || list.find(v => /samantha|aria|jenny|zira|google us english|female/i.test(v.name))
     || list.find(v => /en[-_]us/i.test(v.lang)) || list[0] || null;
   const en = vs.filter(v => /^en[-_]/i.test(v.lang));
   voice = best(en);
@@ -182,22 +247,43 @@ if ('speechSynthesis' in window) {
   speechSynthesis.addEventListener?.('voiceschanged', pickVoice);
 }
 
-export function say(parts, { interrupt = true } = {}) {
+function speakBuiltIn(texts, interrupt) {
   if (!('speechSynthesis' in window)) return;
   if (interrupt) speechSynthesis.cancel();
   // Online-only voices go silent offline, so fall back to one on the device.
   const v = navigator.onLine || voice?.localService ? voice : offlineVoice;
-  for (const [text, rate] of parts) {
+  for (const text of texts) {
     const u = new SpeechSynthesisUtterance(text);
     if (v) u.voice = v;
     u.lang = v?.lang ?? 'en-US';
-    u.rate = rate;
+    u.rate = text.split(' ').length === 1 ? 0.75 : 0.95;
     u.pitch = 1.1;
     speechSynthesis.speak(u);
   }
 }
-export const sayWord = w => say([[w, 0.7]]);
-export const hush = () => window.speechSynthesis?.cancel();
+
+// Say a line made of parts, e.g. say([LINES.find, 'cat']). Parts should come from js/lines.js.
+export function say(parts, { interrupt = true } = {}) {
+  const texts = parts.map(String);
+  const keys = texts.map(voiceKey);
+  if (interrupt) { stopClips(); window.speechSynthesis?.cancel(); }
+  const missing = clipIndex ? keys.filter(k => !clipIndex[k]) : keys;
+  if (!missing.length) {
+    playClips(keys, interrupt).catch(() => speakBuiltIn(texts, false));
+    return;
+  }
+  for (const k of missing) if (clipIndex && !warned.has(k)) { warned.add(k); console.warn(`No voice clip for "${k}"`); }
+  speakBuiltIn(texts, interrupt);
+}
+export const sayWord = w => say([w]);
+export function hush() {
+  stopClips();
+  window.speechSynthesis?.cancel();
+}
+
+// iPhone/iPad: let sound play with the silent switch on, and wake audio on the first touch.
+if (navigator.audioSession) { try { navigator.audioSession.type = 'playback'; } catch { /* unsupported */ } }
+window.addEventListener('pointerdown', () => { try { audio().resume(); } catch { /* audio unavailable */ } }, { capture: true });
 
 // ---------- DOM bits ----------
 // Little emoji that flies across the screen (ingredients into the bag / pot).

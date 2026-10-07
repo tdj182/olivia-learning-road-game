@@ -16,6 +16,7 @@ export const settings = Object.assign(
     speed: 5,      // 1–10, see BASE_SPEED in flight.js
     choices: 3,    // word rings per round: 3, 4 or 5
     rocks: true,   // space rocks to dodge
+    spell: false,  // hard mode: spell the word letter by letter
     ship: 0,       // index into SHIPS (flight.js)
   },
   store.get('owr-settings', {}),
