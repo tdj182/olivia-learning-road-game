@@ -1,37 +1,72 @@
 import * as THREE from 'three';
+import { store } from './state.js';
 
-// Ingredients earned by answering correctly, brewed 3 at a time into potions.
+// Each ingredient belongs to an element. Brewing 3 ingredients:
+//   2 of the same element  -> that element's potion
+//   3 of the same element  -> a Mega potion (bigger and stronger)
+//   3 different elements   -> Rainbow potion (hits every monster)
+export const ELEMENTS = {
+  fire: { name: 'Fire', emoji: '🔥', color: '#ff5a1f' },
+  ice: { name: 'Ice', emoji: '❄️', color: '#55ccff' },
+  zap: { name: 'Zap', emoji: '⚡', color: '#ffd60a' },
+  slime: { name: 'Slime', emoji: '🟢', color: '#6fdc3c' },
+  rainbow: { name: 'Rainbow', emoji: '🌈', color: '#ffffff' },
+};
+
+// Ids are kept from the first version so saved baskets still work.
 export const INGREDIENTS = [
-  { id: 'berry', emoji: '🍓', name: 'Berry', color: '#ff4d6d' },
-  { id: 'mushroom', emoji: '🍄', name: 'Mushroom', color: '#b57cff' },
-  { id: 'flower', emoji: '🌸', name: 'Flower', color: '#ff8fd1' },
-  { id: 'carrot', emoji: '🥕', name: 'Carrot', color: '#ff9f1c' },
-  { id: 'apple', emoji: '🍏', name: 'Apple', color: '#7ed957' },
-  { id: 'honey', emoji: '🍯', name: 'Honey', color: '#ffd23f' },
-  { id: 'crystal', emoji: '💎', name: 'Crystal', color: '#4cc9f0' },
-  { id: 'star', emoji: '⭐', name: 'Star', color: '#fff17a' },
+  { id: 'berry', emoji: '🍓', name: 'Fire Berry', color: '#ff4d6d', element: 'fire' },
+  { id: 'carrot', emoji: '🌶️', name: 'Hot Pepper', color: '#ff7a1c', element: 'fire' },
+  { id: 'crystal', emoji: '💎', name: 'Ice Crystal', color: '#4cc9f0', element: 'ice' },
+  { id: 'flower', emoji: '❄️', name: 'Snowflake', color: '#c8f1ff', element: 'ice' },
+  { id: 'star', emoji: '⭐', name: 'Shooting Star', color: '#fff17a', element: 'zap' },
+  { id: 'honey', emoji: '🍋', name: 'Zappy Lemon', color: '#ffd23f', element: 'zap' },
+  { id: 'mushroom', emoji: '🍄', name: 'Stinky Mushroom', color: '#b57cff', element: 'slime' },
+  { id: 'apple', emoji: '🍏', name: 'Sour Apple', color: '#7ed957', element: 'slime' },
 ];
 export const ingredientById = id => INGREDIENTS.find(i => i.id === id);
 
 export const RAINBOW = ['#ff4d6d', '#ff9f1c', '#ffd23f', '#7ed957', '#4cc9f0', '#b57cff'];
-const ADJECTIVES = ['Bubbly', 'Sparkly', 'Fizzy', 'Giggly', 'Wiggly', 'Glowy', 'Silly', 'Twinkly'];
-const STARTER_BAG = { berry: 2, flower: 2, crystal: 2, star: 1, honey: 1 };
+export const BOTTLES_PER_BREW = 3;
+const STARTER_BAG = { berry: 2, carrot: 1, crystal: 2, flower: 1, star: 2, mushroom: 1 };
 
-function load(key, fallback) {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
-}
-function save(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private mode */ }
+export function potionOf(element, mega = false) {
+  const e = ELEMENTS[element];
+  return { name: `${mega ? 'Mega ' : ''}${e.name} Potion`, element, mega, color: e.color };
 }
 
-// bag: ingredient id -> count. potions: name -> { name, color, kind, count }
+export function brew(ids) {
+  const counts = {};
+  for (const id of ids) { const e = ingredientById(id).element; counts[e] = (counts[e] ?? 0) + 1; }
+  const [top, n] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  if (n === 1) return potionOf('rainbow');
+  return potionOf(top, n === 3);
+}
+
+// Potions saved by the first version (colored/super/rainbow) become elements by color.
+function migrate(saved) {
+  const out = {};
+  for (const p of Object.values(saved)) {
+    let next = p;
+    if (!p.element) {
+      const h = new THREE.Color(p.color ?? '#ff0000').getHSL({}).h * 360;
+      const el = p.kind === 'rainbow' ? 'rainbow'
+        : h < 40 || h >= 330 ? 'fire' : h < 70 ? 'zap' : h < 170 ? 'slime' : h < 260 ? 'ice' : 'slime';
+      next = potionOf(el, p.kind === 'super');
+    }
+    (out[next.name] ??= { ...next, count: 0 }).count += p.count;
+  }
+  return out;
+}
+
+// bag: ingredient id -> count. potions: name -> { name, element, mega, color, count }
 export const inventory = {
-  bag: load('owr-bag', null) ?? { ...STARTER_BAG },
-  potions: load('owr-potions', {}),
+  bag: store.get('owr-bag', null) ?? { ...STARTER_BAG },
+  potions: migrate(store.get('owr-potions', {})),
 
   save() {
-    save('owr-bag', this.bag);
-    save('owr-potions', this.potions);
+    store.set('owr-bag', this.bag);
+    store.set('owr-potions', this.potions);
   },
   ingredientCount() {
     return Object.values(this.bag).reduce((a, b) => a + b, 0);
@@ -51,8 +86,12 @@ export const inventory = {
     this.save();
     return true;
   },
-  addPotion(p) {
-    (this.potions[p.name] ??= { ...p, count: 0 }).count++;
+  giveBack(id) {
+    this.bag[id] = (this.bag[id] ?? 0) + 1;
+    this.save();
+  },
+  addPotion(p, n = 1) {
+    (this.potions[p.name] ??= { ...p, count: 0 }).count += n;
     this.save();
   },
   usePotion(name) {
@@ -65,33 +104,13 @@ export const inventory = {
   },
 };
 
-const COLOR_WORDS = [[0, 'Red'], [20, 'Orange'], [45, 'Yellow'], [75, 'Green'], [165, 'Blue'], [250, 'Purple'], [300, 'Pink'], [345, 'Red']];
-
-// Three ingredients -> potion. All the same: Super potion (big splash).
-// All different: Rainbow potion (splashes every monster). Otherwise a colored potion.
-export function brew(ids) {
-  const ings = ids.map(ingredientById);
-  const unique = new Set(ids).size;
-  if (unique === 3) return { name: 'Rainbow Potion', color: '#ffffff', kind: 'rainbow' };
-
-  const mix = new THREE.Color(0, 0, 0);
-  for (const i of ings) mix.add(new THREE.Color(i.color));
-  mix.multiplyScalar(1 / ings.length);
-  const hsl = mix.getHSL({});
-  mix.setHSL(hsl.h, Math.min(1, hsl.s * 1.35 + 0.1), Math.min(0.62, Math.max(0.45, hsl.l)));
-  const color = `#${mix.getHexString()}`;
-
-  if (unique === 1) return { name: `Super ${ings[0].name} Potion`, color, kind: 'super' };
-
-  const hue = mix.getHSL({}).h * 360;
-  const word = COLOR_WORDS.reduce((best, [h, w]) => (hue >= h ? w : best), 'Red');
-  const hash = [...ids].sort().join('').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  return { name: `${ADJECTIVES[hash % ADJECTIVES.length]} ${word} Potion`, color, kind: 'normal' };
+// One-time gift with the new potion types so they can all be tried right away.
+if (!store.get('owr-gift-v2', false)) {
+  for (const el of ['fire', 'ice', 'zap', 'slime', 'rainbow']) inventory.addPotion(potionOf(el), 2);
+  store.set('owr-gift-v2', true);
 }
 
-export const SPLASH_RADIUS = { normal: 1.8, super: 3.8, rainbow: Infinity };
-
-// A little glass bottle with colored liquid, built in code so any color works.
+// ---------- Bottles ----------
 let rainbowTex;
 function rainbowTexture() {
   if (rainbowTex) return rainbowTex;
@@ -111,11 +130,12 @@ const liquidGeo = new THREE.SphereGeometry(0.3, 24, 16, 0, Math.PI * 2, Math.PI 
 const neckGeo = new THREE.CylinderGeometry(0.11, 0.13, 0.28, 16);
 const corkGeo = new THREE.CylinderGeometry(0.1, 0.085, 0.14, 12);
 
+// A little glass bottle with colored liquid, built in code so any color works.
 export function makeBottle(potion) {
   const g = new THREE.Group();
-  const liquidMat = potion.kind === 'rainbow'
-    ? new THREE.MeshStandardMaterial({ map: rainbowTexture(), emissive: '#ffffff', emissiveMap: rainbowTexture(), emissiveIntensity: 0.35, roughness: 0.3 })
-    : new THREE.MeshStandardMaterial({ color: potion.color, emissive: potion.color, emissiveIntensity: 0.35, roughness: 0.3 });
+  const liquidMat = potion.element === 'rainbow'
+    ? new THREE.MeshStandardMaterial({ map: rainbowTexture(), emissive: '#ffffff', emissiveMap: rainbowTexture(), emissiveIntensity: 0.4, roughness: 0.3 })
+    : new THREE.MeshStandardMaterial({ color: potion.color, emissive: potion.color, emissiveIntensity: 0.45, roughness: 0.3 });
   const liquid = new THREE.Mesh(liquidGeo, liquidMat);
   const body = new THREE.Mesh(bodyGeo, glassMat);
   const neck = new THREE.Mesh(neckGeo, glassMat);
@@ -123,14 +143,14 @@ export function makeBottle(potion) {
   const cork = new THREE.Mesh(corkGeo, corkMat);
   cork.position.y = 0.6;
   g.add(liquid, body, neck, cork);
-  if (potion.kind === 'super') g.scale.setScalar(1.25);
+  if (potion.mega) g.scale.setScalar(1.3);
   return g;
 }
 
-// Small inline SVG bottle for the DOM (buttons, shelves).
+// Small inline SVG bottle for the DOM (buttons, messages).
 export function bottleSvg(potion, size = 44) {
   const id = `rb${Math.random().toString(36).slice(2, 8)}`;
-  const fill = potion.kind === 'rainbow' ? `url(#${id})` : potion.color;
+  const fill = potion.element === 'rainbow' ? `url(#${id})` : potion.color;
   const stops = RAINBOW.map((c, i) => `<stop offset="${(i / (RAINBOW.length - 1)) * 100}%" stop-color="${c}"/>`).join('');
   return `<svg width="${size}" height="${size}" viewBox="0 0 40 40" aria-hidden="true">
     <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">${stops}</linearGradient></defs>

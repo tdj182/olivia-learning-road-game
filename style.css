@@ -36,7 +36,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; }
   font-size: 26px; display: grid; place-items: center;
 }
 .round.small { width: 48px; height: 48px; font-size: 22px; }
-.round:active, .big:active, .steer:active, .chip:active { transform: translateY(3px); }
+.round:active, .big:active, .chip:active { transform: translateY(3px); }
 
 /* Loading */
 #loading {
@@ -94,14 +94,6 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; }
 #stars.bump { animation: bump 0.5s ease; }
 @keyframes bump { 40% { transform: scale(1.35); } }
 
-.steer {
-  position: absolute; bottom: max(20px, env(safe-area-inset-bottom)); width: 96px; height: 96px; border-radius: 50%;
-  background: rgba(255, 253, 246, 0.92); box-shadow: var(--shadow);
-  display: grid; place-items: center;
-}
-.steer svg { width: 52px; height: 52px; fill: none; stroke: var(--ink); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
-#btnLeft { left: 18px; }
-#btnRight { right: 18px; }
 
 #toast {
   position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%) scale(0.6);
@@ -167,7 +159,6 @@ section { margin-top: 20px; }
   #targetWord { font-size: 42px; }
   .round { width: 48px; height: 48px; font-size: 22px; }
   #target { top: 76px; }
-  .steer { width: 84px; height: 84px; }
   #toast { font-size: 26px; }
   #banner { font-size: 30px; }
 }
@@ -256,7 +247,8 @@ section { margin-top: 20px; }
   background: var(--card); border-radius: 24px; padding: 12px 24px; box-shadow: var(--shadow);
   font-size: 28px; font-weight: 800; opacity: 0; transition: opacity 0.3s; white-space: nowrap;
 }
-.battle-hint.show { opacity: 1; animation: pulse 1.2s ease-in-out infinite; }
+.battle-hint.show { opacity: 1; animation: pulseCenter 1.2s ease-in-out infinite; }
+@keyframes pulseCenter { 50% { transform: translate(-50%, -50%) scale(1.08); } }
 .overlay {
   position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
   background: rgba(159, 216, 255, 0.4);
@@ -266,9 +258,85 @@ section { margin-top: 20px; }
 @media (max-width: 600px) {
   .mode-title { top: 72px; font-size: 22px; }
   .slot, .ing, .potion-btn { width: 54px; height: 54px; }
-  .tray { display: grid; grid-template-columns: repeat(4, 54px); gap: 10px; }
+  .tray { display: grid; grid-template-columns: repeat(4, 54px); gap: 12px; }
   .ing .e { font-size: 32px; }
   .lab-msg { font-size: 18px; }
   .battle-hint { font-size: 22px; }
 }
 .potion-bar:empty { display: none; }
+
+/* Flight */
+.streak {
+  background: linear-gradient(135deg, #ff9f43, var(--pink)); color: #fff; border-radius: 22px; padding: 4px 14px;
+  font-size: 20px; font-weight: 800; box-shadow: var(--shadow);
+}
+.streak.bump { animation: bump 0.5s ease; }
+.fly-hint {
+  position: absolute; left: 50%; bottom: max(28px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+  background: var(--card); border-radius: 24px; padding: 10px 24px; box-shadow: var(--shadow);
+  font-size: 26px; font-weight: 800; white-space: nowrap; opacity: 0; transition: opacity 0.3s;
+}
+.fly-hint.show { opacity: 1; animation: pulseX 1.2s ease-in-out infinite; }
+@keyframes pulseX { 50% { transform: translateX(-50%) scale(1.08); } }
+.float-text {
+  position: fixed; z-index: 30; pointer-events: none; font-size: 28px; font-weight: 800; white-space: nowrap;
+  color: #fff; text-shadow: 0 2px 0 var(--ink), 0 0 6px rgba(35, 49, 94, 0.6);
+}
+.float-text.good { color: #b6ffcf; }
+.float-text.bad { color: #ffd0dc; font-size: 32px; }
+.float-text.dmg { font-size: 24px; color: #fff27a; }
+.float-text.dmg.ice { color: #bfefff; }
+.float-text.dmg.burn { color: #ffb38a; font-size: 18px; }
+.float-text.dmg.goo { color: #b8f27a; font-size: 18px; }
+
+/* Lab drag + stir */
+.ing { touch-action: none; }
+.ing.lifted { opacity: 0.5; transform: scale(0.9); }
+.ing .el, .potion-btn .el {
+  position: absolute; left: -6px; top: -6px; font-size: 16px; line-height: 1;
+  background: var(--card); border-radius: 50%; width: 24px; height: 24px; display: grid; place-items: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+.drag-emoji { position: fixed; left: 0; top: 0; z-index: 40; font-size: 56px; pointer-events: none; filter: drop-shadow(0 6px 6px rgba(0,0,0,0.35)); transition: transform 0.05s; }
+.stir-ring { position: fixed; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.stir-ring .track { fill: none; stroke: rgba(255, 255, 255, 0.25); stroke-width: 5; stroke-dasharray: 3 4; }
+.stir-ring .arc {
+  fill: none; stroke: #fff17a; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100;
+  transform: rotate(-90deg); transform-origin: 50% 50%; filter: drop-shadow(0 0 4px #fff17a);
+}
+#lab.pot-hot .tray { box-shadow: 0 0 0 4px #b57cff, var(--shadow); }
+
+/* Battle */
+.hearts { font-size: 26px; display: flex; gap: 2px; background: var(--card); border-radius: 26px; padding: 6px 12px; box-shadow: var(--shadow); }
+.hearts .lost { opacity: 0.45; }
+.hearts.bump { animation: shakeX 0.4s ease; }
+@keyframes shakeX { 25% { transform: translateX(-8px); } 50% { transform: translateX(8px); } 75% { transform: translateX(-4px); } }
+.battle-banner {
+  position: absolute; left: 50%; top: 32%; transform: translate(-50%, -50%) scale(0.4) rotate(-6deg);
+  background: linear-gradient(135deg, #9b5de5, var(--pink)); color: #fff; border-radius: 28px; padding: 14px 32px;
+  box-shadow: var(--shadow); font-size: 40px; font-weight: 800; white-space: nowrap; opacity: 0;
+  transition: opacity 0.3s, transform 0.5s cubic-bezier(.3, 1.6, .5, 1);
+}
+.battle-banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-3deg); }
+.potion-btn .mega {
+  position: absolute; left: 50%; top: -9px; transform: translateX(-50%); background: var(--pink); color: #fff;
+  font-size: 10px; font-weight: 800; border-radius: 6px; padding: 0 4px; letter-spacing: 0.5px;
+}
+.potion-btn.wand .wand-icon { font-size: 34px; }
+.end-sub { font-size: 20px; margin: -6px 0 16px; }
+
+/* Menu: challenge settings */
+.speed-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
+.speed-label { font-size: 18px; font-weight: 800; opacity: 0.7; }
+.speed-value { min-width: 2ch; font-size: 30px; font-weight: 800; }
+.chip:disabled { opacity: 0.35; cursor: default; }
+.chips.labeled { align-items: center; }
+.ship-chip { font-size: 28px; }
+#pauseOverlay .speed-row { margin-bottom: 18px; }
+
+@media (max-width: 600px) {
+  .fly-hint { font-size: 20px; }
+  .battle-banner { font-size: 28px; }
+  .hearts { font-size: 18px; top: 72px; }
+  .drag-emoji { font-size: 48px; }
+}

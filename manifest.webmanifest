@@ -1,7 +1,7 @@
 {
   "name": "Olivia's Word Road",
   "short_name": "Word Road",
-  "description": "A driving game for practicing kindergarten words and numbers.",
+  "description": "A space flying game for practicing kindergarten words and numbers, with potions and monster battles.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
