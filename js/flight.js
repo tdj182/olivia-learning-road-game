@@ -23,6 +23,10 @@ const GEM_RADIUS = 1.4;
 const NEXT_ROUND_DELAY = 1.1;
 const CELEBRATE_EVERY = 5;
 const RING_COLORS = ['#ff6fa8', '#ffb627', '#3fa7ff', '#38c172', '#b57cff'];
+// Joystick feel: top speed at full push, and a dead zone in the middle. Speed rises with the
+// square of the push, so small nudges make small, careful moves.
+const STICK_SPEED = 7;          // world units per second at full push
+const STICK_DEAD_ZONE = 0.15;   // fraction of the stick's reach that does nothing
 const LASER_SPEED = 70;
 const LASER_COOLDOWN = 0.22;
 // Letters that get mixed up, used as wrong choices in Spell it mode.
@@ -643,7 +647,10 @@ export function createFlight({ renderer }) {
       // Menu: cruise around on its own.
       aim.set(Math.sin(t * 0.5) * 2.5, 2.4 + Math.sin(t * 0.8) * 0.8);
     } else if (stick.active) {
-      aim.set(THREE.MathUtils.clamp(ship.position.x + stick.x * 2.2, -AREA.x, AREA.x), THREE.MathUtils.clamp(ship.position.y + stick.y * 2.2, AREA.yMin, AREA.yMax));
+      // The ship closes 8x its distance to the aim point per second (below), so aim speed / 8 ahead.
+      const push = Math.hypot(stick.x, stick.y);
+      const k = push > STICK_DEAD_ZONE ? ((push - STICK_DEAD_ZONE) / (1 - STICK_DEAD_ZONE)) ** 2 * STICK_SPEED / 8 / push : 0;
+      aim.set(THREE.MathUtils.clamp(ship.position.x + stick.x * k, -AREA.x, AREA.x), THREE.MathUtils.clamp(ship.position.y + stick.y * k, AREA.yMin, AREA.yMax));
     } else if (keys.size) {
       const kx = (keys.has('right') ? 1 : 0) - (keys.has('left') ? 1 : 0);
       const ky = (keys.has('up') ? 1 : 0) - (keys.has('down') ? 1 : 0);
