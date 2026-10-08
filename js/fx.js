@@ -153,6 +153,7 @@ export const sfx = {
   whoosh: () => [700, 600, 500, 420].forEach((f, i) => tone(f, i * 0.04, 0.08, 'sine', 0.06)),
   chirp: () => [880, 1175, 1568].forEach((f, i) => tone(f, i * 0.07, 0.14, 'sine', 0.08)),
   boom: () => { noise(0, 0.45, 0.35, 1200); sweep(220, 50, 0, 0.4, 'square', 0.08); },
+  boost: () => { sweep(200, 900, 0, 0.5, 'sawtooth', 0.06); noise(0, 0.6, 0.15, 3000); },
   laser: () => sweep(1800, 600, 0, 0.1, 'square', 0.04),
   letter: () => [784, 1047].forEach((f, i) => tone(f, i * 0.06, 0.15, 'triangle', 0.12)),
   bonk: () => { tone(110, 0, 0.25, 'square', 0.1); noise(0, 0.25, 0.3, 700); },

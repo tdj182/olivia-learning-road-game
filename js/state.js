@@ -17,6 +17,7 @@ export const settings = Object.assign(
     choices: 3,    // word rings per round: 3, 4 or 5
     rocks: true,   // space rocks to dodge
     spell: false,  // hard mode: spell the word letter by letter
+    steering: 'easy', // steering help: 'easy' | 'normal' | 'expert' (STEERING in flight.js)
     ship: 0,       // index into SHIPS (flight.js)
   },
   store.get('owr-settings', {}),

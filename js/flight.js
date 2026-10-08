@@ -15,9 +15,19 @@ const SPAWN_Z = -105;           // where word rings appear
 const LETTER_SPAWN_Z = -75;     // Spell it mode: letter rings come closer together
 const NEAR_Z = 14;              // things behind the camera get removed
 const STAR_SPAN = 220;
-const AREA = { x: 4.4, yMin: 0.8, yMax: 4.4 }; // where the ship can fly
+// The ship flies left and right only, along one row at height ROW_Y.
+const ROW_Y = 2.4;
+const AREA = { x: 4.6, yMin: ROW_Y, yMax: ROW_Y };
 const RING_R = 1.35;
-const HIT_RADIUS = 1.55;        // how close to a ring's center counts as flying through it
+// Steering help (the Steering setting). reach: how far from a ring's center still counts as
+// flying through it. pull: how strongly the ship is drawn into the ring it's lined up with as
+// the ring arrives (0 = none). Easy also puts 3 rings in one row.
+const STEERING = {
+  easy: { reach: Infinity, pull: 5 },
+  normal: { reach: 3, pull: 1.5 },
+  expert: { reach: 1.55, pull: 0 },
+};
+const steering = () => STEERING[settings.steering] ?? STEERING.easy;
 const ROCK_RADIUS = 1.05;
 const GEM_RADIUS = 1.4;
 const NEXT_ROUND_DELAY = 1.1;
@@ -27,6 +37,10 @@ const RING_COLORS = ['#ff6fa8', '#ffb627', '#3fa7ff', '#38c172', '#b57cff'];
 // square of the push, so small nudges make small, careful moves.
 const STICK_SPEED = 7;          // world units per second at full push
 const STICK_DEAD_ZONE = 0.15;   // fraction of the stick's reach that does nothing
+// Speed boost: double-tap the screen (or press ↑ / W).
+const BOOST_MULT = 2;           // world speed while boosting
+const BOOST_TIME = 2.5;         // seconds
+const DOUBLE_TAP_MS = 350;
 const LASER_SPEED = 70;
 const LASER_COOLDOWN = 0.22;
 // Letters that get mixed up, used as wrong choices in Spell it mode.
@@ -107,7 +121,7 @@ export function createFlight({ renderer }) {
         return w;
       });
       ship = new THREE.Group();
-      ship.position.set(0, 2.2, 0);
+      ship.position.set(0, ROW_Y, 0);
       scene.add(ship);
       setShip(settings.ship);
 
@@ -171,6 +185,12 @@ export function createFlight({ renderer }) {
   const cardGeo = new THREE.PlaneGeometry(2.2, 1.1);
   const ringGeo = new THREE.TorusGeometry(RING_R, 0.09, 10, 48);
 
+  // Glow around the ring the ship is lined up with, so she can see where she'll go.
+  const halo = new THREE.Mesh(
+    new THREE.TorusGeometry(RING_R + 0.12, 0.22, 10, 48),
+    new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }),
+  );
+
   function makePortal(word, color) {
     const g = new THREE.Group();
     const card = new THREE.Mesh(cardGeo, new THREE.MeshBasicMaterial({ map: cardTexture(word, color), transparent: true }));
@@ -180,18 +200,16 @@ export function createFlight({ renderer }) {
     return g;
   }
 
-  // Ring positions for 3, 4 or 5 choices, spread up/down as well as left/right.
+  // Ring positions for 3, 4 or 5 choices, all in one row. 5 rings are drawn a bit smaller to fit.
+  const ROWS = { 3: [-3.3, 0, 3.3], 4: [-4.35, -1.45, 1.45, 4.35], 5: [-4.6, -2.3, 0, 2.3, 4.6] };
+  const ringScale = n => (n >= 5 ? 0.82 : 1);
   function layout(n) {
-    const rows = [1.4, 2.6, 3.8];
-    const pick = a => a[Math.floor(Math.random() * a.length)];
-    if (n === 3) return [-3.3, 0, 3.3].map(x => [x, pick(rows)]);
-    if (n === 4) return [[-2.3, 1.4], [2.3, 1.4], [-2.3, 3.8], [2.3, 3.8]].map(([x, y]) => [x + (Math.random() - 0.5) * 1.2, y]);
-    const top = Math.random() < 0.5;
-    return [...[-3.4, 0, 3.4].map(x => [x, top ? 3.8 : 1.4]), ...[-1.7, 1.7].map(x => [x, top ? 1.4 : 3.8])];
+    return (ROWS[n] ?? ROWS[3]).map(x => [x, ROW_Y]);
   }
 
   function disposeGroup(g) {
     g.traverse(o => {
+      if (o === halo) return;
       if (o.material?.map) o.material.map.dispose();
       if (o.material && !trailMats.includes(o.material)) o.material.dispose?.();
     });
@@ -204,6 +222,7 @@ export function createFlight({ renderer }) {
     pool: [],
     target: null,
     gate: null,            // { group, portals, answer, kind: 'word' | 'letter', evaluated, reminded, hint }
+    locked: null,          // ring she tapped to fly to
     spelling: false,       // Spell it mode: partway through a word
     spellAt: 0,
     wordMissed: false,
@@ -222,7 +241,7 @@ export function createFlight({ renderer }) {
   let rockIn = 3;
   let gemIn = 10;
   let shake = 0;
-  const aim = new THREE.Vector2(0, 2.2);
+  const aim = new THREE.Vector2(0, ROW_Y);
   const keys = new Set();
   let pointerDown = false;
   const stick = { x: 0, y: 0, active: false, id: null };
@@ -230,7 +249,22 @@ export function createFlight({ renderer }) {
   let fireCd = 0;
   const lasers = [];
 
-  const worldSpeed = () => BASE_SPEED * speedFactor(settings.speed) * (1 + Math.min(game.streak, 10) * STREAK_BOOST);
+  let boostLeft = 0;              // seconds of boost remaining
+  let boostLevel = 0;             // 0..1, eased in and out
+  let lastTap = { t: 0, x: 0, y: 0 };
+  let baseFov = 60;
+  const worldSpeed = () => BASE_SPEED * speedFactor(settings.speed) * (1 + Math.min(game.streak, 10) * STREAK_BOOST)
+    * (1 + boostLevel * (BOOST_MULT - 1));
+
+  function boost() {
+    if (!game.playing || game.paused || !ship) return;
+    if (boostLeft <= 0) {
+      sfx.boost();
+      const s = toScreen(ship.position, camera);
+      floatText('Zoom! 🚀', s.x, s.y - 50, 'good');
+    }
+    boostLeft = BOOST_TIME;
+  }
 
   function weightFor(word) {
     const s = stats[word] ?? { c: 0, m: 0 };
@@ -266,6 +300,8 @@ export function createFlight({ renderer }) {
     const portals = labels.map((w, i) => {
       const p = makePortal(w, RING_COLORS[i % RING_COLORS.length]);
       p.position.set(spots[i][0], spots[i][1], 0);
+      p.userData.base = ringScale(labels.length);
+      p.scale.setScalar(p.userData.base);
       group.add(p);
       return p;
     });
@@ -345,15 +381,23 @@ export function createFlight({ renderer }) {
     if (game.sessionStars % CELEBRATE_EVERY === 0) setTimeout(celebrate, 1400);
   }
 
+  // The ring closest to the ship (within reach for the Steering setting), or null.
+  function linedUp(gate) {
+    let best = null;
+    let bestD = steering().reach;
+    for (const p of gate.portals) {
+      const d = Math.hypot(p.position.x - ship.position.x, p.position.y - ship.position.y);
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    return best;
+  }
+
   function evaluateGate() {
     const gate = game.gate;
     gate.evaluated = true;
-    let chosen = null;
-    let best = HIT_RADIUS;
-    for (const p of gate.portals) {
-      const d = Math.hypot(p.position.x - ship.position.x, p.position.y - ship.position.y);
-      if (d < best) { best = d; chosen = p; }
-    }
+    const chosen = linedUp(gate);
+    halo.removeFromParent();
+    game.locked = null;
     if (chosen) chosen.userData.pop = 0;
     for (const p of gate.portals) if (p !== chosen) p.userData.fade = 0;
     if (gate.kind === 'letter') evaluateLetter(gate, chosen);
@@ -486,6 +530,8 @@ export function createFlight({ renderer }) {
   }
 
   function clearGate() {
+    halo.removeFromParent();
+    game.locked = null;
     if (!game.gate) return;
     scene.remove(game.gate.group);
     disposeGroup(game.gate.group);
@@ -513,7 +559,7 @@ export function createFlight({ renderer }) {
   function spawnGem() {
     const color = ['#ff6fa8', '#4cc9f0', '#ffd23f', '#7ed957'][Math.floor(Math.random() * 4)];
     const g = new THREE.Mesh(gemGeo, new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.6, roughness: 0.2 }));
-    g.position.set((Math.random() * 2 - 1) * AREA.x, AREA.yMin + 0.4 + Math.random() * (AREA.yMax - AREA.yMin - 0.8), SPAWN_Z);
+    g.position.set((Math.random() * 2 - 1) * AREA.x, ROW_Y, SPAWN_Z);
     g.scale.y = 1.4;
     g.userData = { passed: false, color };
     scene.add(g);
@@ -632,9 +678,37 @@ export function createFlight({ renderer }) {
   // ---------- Input ----------
   const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
   const ray = new THREE.Raycaster();
-  function aimAt(e) {
+  function aimAt(e, tap = false) {
     const ndc = new THREE.Vector2((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
     ray.setFromCamera(ndc, camera);
+    // Tapping a ring: fly to it and stay lined up with it.
+    const gate = game.gate;
+    if (tap && gate && !gate.evaluated) {
+      // A tap right on a ring picks it. Far away the rings are tiny and close together, so
+      // otherwise the screen works like zones: tap left for the left ring, top for the top row...
+      const spots = gate.portals.map(p => toScreen(p.getWorldPosition(new THREE.Vector3()), camera));
+      let o = null;
+      let bestD = 45;
+      spots.forEach((sp, i) => { const d = Math.hypot(sp.x - e.clientX, sp.y - e.clientY); if (d < bestD) { bestD = d; o = gate.portals[i]; } });
+      if (!o) {
+        const xs = spots.map(sp => sp.x), ys = spots.map(sp => sp.y);
+        const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+        const sx = Math.max(1, (Math.max(...xs) - Math.min(...xs)) / 2), sy = (Math.max(...ys) - Math.min(...ys)) / 2;
+        const tx = (e.clientX - window.innerWidth / 2) / (window.innerWidth / 3);
+        const ty = (e.clientY - window.innerHeight / 2) / (window.innerHeight / 4);
+        bestD = Infinity;
+        spots.forEach((sp, i) => {
+          const d = Math.hypot((sp.x - cx) / sx - tx, sy > 2 ? (sp.y - cy) / sy - ty : 0);
+          if (d < bestD) { bestD = d; o = gate.portals[i]; }
+        });
+      }
+      if (o) {
+        game.locked = o;
+        if (!game.steered) { game.steered = true; ui.hint.classList.remove('show'); }
+        return;
+      }
+    }
+    game.locked = null;
     const p = ray.ray.intersectPlane(plane, new THREE.Vector3());
     if (!p) return;
     aim.set(THREE.MathUtils.clamp(p.x, -AREA.x, AREA.x), THREE.MathUtils.clamp(p.y, AREA.yMin, AREA.yMax));
@@ -645,16 +719,32 @@ export function createFlight({ renderer }) {
   function updateShip(dt, t) {
     if (!game.playing) {
       // Menu: cruise around on its own.
-      aim.set(Math.sin(t * 0.5) * 2.5, 2.4 + Math.sin(t * 0.8) * 0.8);
+      aim.set(Math.sin(t * 0.5) * 2.5, ROW_Y);
     } else if (stick.active) {
+      game.locked = null;
       // The ship closes 8x its distance to the aim point per second (below), so aim speed / 8 ahead.
-      const push = Math.hypot(stick.x, stick.y);
+      const push = Math.abs(stick.x);
       const k = push > STICK_DEAD_ZONE ? ((push - STICK_DEAD_ZONE) / (1 - STICK_DEAD_ZONE)) ** 2 * STICK_SPEED / 8 / push : 0;
-      aim.set(THREE.MathUtils.clamp(ship.position.x + stick.x * k, -AREA.x, AREA.x), THREE.MathUtils.clamp(ship.position.y + stick.y * k, AREA.yMin, AREA.yMax));
-    } else if (keys.size) {
+      aim.set(THREE.MathUtils.clamp(ship.position.x + stick.x * k, -AREA.x, AREA.x), ROW_Y);
+    } else if (keys.size && [...keys].some(k => k !== 'fire')) {
+      game.locked = null;
       const kx = (keys.has('right') ? 1 : 0) - (keys.has('left') ? 1 : 0);
       const ky = (keys.has('up') ? 1 : 0) - (keys.has('down') ? 1 : 0);
       aim.set(THREE.MathUtils.clamp(ship.position.x + kx * 2, -AREA.x, AREA.x), THREE.MathUtils.clamp(ship.position.y + ky * 2, AREA.yMin, AREA.yMax));
+    }
+    const gate = game.playing && game.gate && !game.gate.evaluated ? game.gate : null;
+    if (gate && game.locked) aim.set(game.locked.position.x, game.locked.position.y);
+    // Steering help: as the ring gets close, draw the ship into the one it's lined up with.
+    const pull = steering().pull;
+    if (gate && pull && !game.locked) {
+      const p = linedUp(gate);
+      const near = THREE.MathUtils.clamp((gate.group.position.z + 40) / 40, 0, 1);
+      if (p && near > 0) {
+        const steeringNow = stick.active || keys.size;
+        const k = Math.min(1, dt * pull * near * near * (steeringNow ? 0.35 : 1));
+        aim.x += (p.position.x - aim.x) * k;
+        aim.y += (p.position.y - aim.y) * k;
+      }
     }
     const maxStep = (8 + 4 * speedFactor(settings.speed)) * dt;
     const dx = aim.x - ship.position.x;
@@ -677,10 +767,10 @@ export function createFlight({ renderer }) {
   function updateTrail(dt, dz) {
     trailIn -= dt;
     if (ship && trailIn <= 0) {
-      trailIn = 0.035;
+      trailIn = boostLevel > 0.2 ? 0.015 : 0.035;
       const m = new THREE.Mesh(trailGeo, trailMats[trail.length % trailMats.length]);
       m.position.set(ship.position.x + (Math.random() - 0.5) * 0.3, ship.position.y + (Math.random() - 0.5) * 0.15, ship.position.z + 0.9);
-      m.userData.life = 0.35;
+      m.userData.life = 0.35 + boostLevel * 0.35;
       scene.add(m);
       trail.push(m);
     }
@@ -695,8 +785,12 @@ export function createFlight({ renderer }) {
   }
 
   function updateCamera(dt) {
+    boostLeft = Math.max(0, boostLeft - dt);
+    boostLevel += ((boostLeft > 0 ? 1 : 0) - boostLevel) * Math.min(1, dt * (boostLeft > 0 ? 6 : 2));
+    const fov = baseFov + boostLevel * 9;
+    if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
     const sx = ship ? ship.position.x : 0;
-    const sy = ship ? ship.position.y : 2.2;
+    const sy = ship ? ship.position.y : ROW_Y;
     camera.position.set(camBase.x + sx * 0.25, camBase.y + (sy - 2.4) * 0.2, camBase.z);
     if (shake > 0) {
       shake -= dt;
@@ -740,9 +834,16 @@ export function createFlight({ renderer }) {
       gate.group.position.z += dz;
       const z = gate.group.position.z;
       for (const p of gate.portals) p.userData.ring.rotation.z += dt * 0.8;
-      if (gate.hint && !gate.evaluated) {
-        const p = gate.portals.find(o => o.userData.word === gate.answer);
-        p.scale.setScalar(1 + Math.sin(t * 8) * 0.08);
+      if (!gate.evaluated) {
+        const lined = game.locked ?? linedUp(gate);
+        if (lined && halo.parent !== lined) lined.add(halo);
+        if (!lined) halo.removeFromParent();
+        halo.material.opacity = 0.4 + Math.sin(t * 10) * 0.2;
+        for (const p of gate.portals) {
+          const pulse = gate.hint && p.userData.word === gate.answer ? 1 + Math.sin(t * 8) * 0.08 : 1;
+          const goal = (p === lined ? 1.15 : 1) * pulse * p.userData.base;
+          p.scale.setScalar(p.scale.x + (goal - p.scale.x) * Math.min(1, dt * 12));
+        }
       }
       if (!gate.reminded && z > SPAWN_Z / 2) {
         gate.reminded = true;
@@ -756,7 +857,7 @@ export function createFlight({ renderer }) {
           p.rotation.y += dt * 10;
         } else if (p.userData.fade !== undefined) {
           p.userData.fade += dt;
-          p.scale.setScalar(Math.max(0.01, 1 - p.userData.fade * 1.5));
+          p.scale.setScalar(Math.max(0.01, (1 - p.userData.fade * 1.5) * p.userData.base));
         }
       }
       if (z > NEAR_Z) clearGate();
@@ -823,6 +924,7 @@ export function createFlight({ renderer }) {
       game.bonks = 0;
       game.steered = false;
       game.spelling = false;
+      boostLeft = 0;
       setStreak(0);
       clearGate();
       clearObstacles();
@@ -834,7 +936,7 @@ export function createFlight({ renderer }) {
       game.nextRoundIn = 1.2;
       rockIn = 4;
       gemIn = 8;
-      aim.set(0, 2.2);
+      aim.set(0, ROW_Y);
       say([LINES.blastOff]);
       preloadVoice([LINES.find, LINES.spell, LINES.inARow, LINES.youSpelled, ...PRAISE, ...pool, ...new Set(pool.flatMap(w => [...w].map(letterLine)))]);
     },
@@ -861,14 +963,18 @@ export function createFlight({ renderer }) {
     onPointerDown(e) {
       if (!game.playing || game.paused) return;
       pointerDown = true;
-      aimAt(e);
+      const now = performance.now();
+      if (now - lastTap.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 80) boost();
+      lastTap = { t: now, x: e.clientX, y: e.clientY };
+      aimAt(e, true);
     },
     onPointerMove(e) {
-      if (pointerDown && game.playing && !game.paused) aimAt(e);
+      if (pointerDown && game.playing && !game.paused && !game.locked) aimAt(e);
     },
     onPointerUp() { pointerDown = false; },
     onKey(e, down) {
-      const k = { ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right', ArrowUp: 'up', w: 'up', ArrowDown: 'down', s: 'down', ' ': 'fire' }[e.key];
+      if ((e.key === 'ArrowUp' || e.key === 'w') && down) { boost(); return true; }
+      const k = { ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right', ' ': 'fire' }[e.key];
       if (!k) return false;
       if (down) keys.add(k); else keys.delete(k);
       if (!game.steered && down) { game.steered = true; ui.hint.classList.remove('show'); }
@@ -878,7 +984,8 @@ export function createFlight({ renderer }) {
     resize(aspect) {
       camera.aspect = aspect;
       // Keep the whole flying area in view on narrow (portrait) screens.
-      camera.fov = aspect < 1 ? 74 : 60;
+      baseFov = aspect < 1 ? 74 : 60;
+      camera.fov = baseFov;
       const half = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
       camBase.z = Math.max(9, (AREA.x + 1.6) / (half * aspect));
       camBase.y = 5 + Math.max(0, camBase.z - 9) * 0.12;

@@ -131,6 +131,16 @@ function renderMenu() {
     b.onclick = () => { settings.choices = n; update(); };
     choiceChips.appendChild(b);
   }
+  const steerChips = $('steerChips');
+  steerChips.innerHTML = '';
+  for (const [id, label] of [['easy', '🙂 Easy'], ['normal', '😎 Normal'], ['expert', '🔥 Expert']]) {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = label;
+    b.setAttribute('aria-pressed', settings.steering === id);
+    b.onclick = () => { settings.steering = id; update(); };
+    steerChips.appendChild(b);
+  }
   const shipChips = $('shipChips');
   shipChips.innerHTML = '';
   SHIPS.forEach((s, i) => {

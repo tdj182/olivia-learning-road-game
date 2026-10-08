@@ -4,7 +4,9 @@ A 3D space-flying game for practicing the HMH Into Reading kindergarten word lis
 
 The game says a word out loud. Fly the spaceship through the ring with that word.
 
-- **Fly:** the joystick in the bottom-left corner (or touch and drag anywhere, or the arrow keys / WASD). Rings can be high or low, so she has to steer up and down as well as left and right.
+- **Fly:** left and right only. The rings are always in one row. Use the joystick in the bottom-left corner, the ← → keys, or just **tap a ring** and the ship flies to it. When the rings are still far away and tiny, tapping the left, middle or right of the screen picks that ring.
+- The ring the ship is lined up with glows, so she can see which one she'll fly through.
+- **Speed boost 🚀:** double-tap anywhere on the screen (or press ↑ / W) to zoom at double speed for a couple of seconds. The settings are `BOOST_MULT` and `BOOST_TIME` in `js/flight.js`.
 - **💥 Fire** (bottom-right, or **Space**): lasers that blow up space rocks. Hold it down to keep firing.
 - **🔊** (or **R**) says the word again. **P** or **Esc** pauses.
 - If she flies through a wrong ring, the game reads that word aloud and asks for the right one again. Flying past every ring counts as a miss too. After two misses in a row, the right ring pulses as a hint.
@@ -16,6 +18,7 @@ The game says a word out loud. Fly the spaceship through the ring with that word
 
 - **Speed 1–10** (🐢/🐇). It can also be changed on the pause card mid-game. Level 5 is the default and is already faster than the old truck. The base speed is the `BASE_SPEED` constant at the top of `js/flight.js`.
 - **Words 3 / 4 / 5:** how many rings per round.
+- **Steering:** how much help she gets getting into a ring. **Easy** (the default): the ship is gently pulled into the ring it's lined up with, and the closest ring always counts. **Normal**: a lighter pull, and she has to be fairly close. **Expert**: no help; she has to fly right through the middle.
 - **Space rocks** on or off.
 - **✏️ Spell it (hard):** instead of finding the whole word, she spells it. Each ring has a letter, and she flies through the letters in order. The word at the top fills in as she goes. A wrong letter is read aloud ("Oops! That's n. Try again!") and that letter comes around again. Wrong choices are look-alike letters (b/d/p, m/n, i/l). Turn off **Show it** too, and she has to spell from listening alone.
 - **Spaceship:** 🐝 🦩 🐸 🦊.
