@@ -26,7 +26,7 @@
 <body>
   <canvas id="c"></canvas>
 
-  <div id="loading"><div class="spinner"></div><p>Fueling up the rocket…</p></div>
+  <div id="loading"><div class="spinner"></div><p>Getting ready…</p></div>
 
   <div id="hud" hidden>
     <div class="hud-left">
@@ -45,7 +45,7 @@
     </div>
     <div id="stick" class="stick" aria-label="Joystick"><div class="knob"></div></div>
     <button id="btnFire" class="fire-btn" aria-label="Fire">💥</button>
-    <div id="flyHint" class="fly-hint">🕹️ Steer · 💥 Blast rocks!</div>
+    <div id="flyHint" class="fly-hint">🕹️ Steer · 💥 Blast · Tap twice to zoom!</div>
     <div id="toast"></div>
     <div id="banner"></div>
   </div>
@@ -54,6 +54,10 @@
     <button id="btnLabHome" class="round corner-left" aria-label="Home">🏠</button>
     <div class="mode-title">🧪 Potion Lab</div>
     <div class="corner-right shelf-count" title="Potions"><span>🧪</span><span id="labPotionCount">0</span></div>
+    <div id="magic" class="magic" hidden>
+      <div class="magic-title">✨ <span id="magicPrompt">Find the magic word!</span> <button id="btnMagicSay" class="round" aria-label="Say it again">🔊</button></div>
+      <div id="magicBubbles" class="magic-bubbles"></div>
+    </div>
     <svg id="stirRing" class="stir-ring" viewBox="0 0 100 100" hidden aria-hidden="true">
       <circle cx="50" cy="50" r="46" pathLength="100" class="track" />
       <circle id="stirArc" cx="50" cy="50" r="46" pathLength="100" class="arc" />
@@ -98,7 +102,7 @@
         <span id="pauseSpeedValue" class="speed-value">5</span>
         <button id="pauseSpeedUp" class="chip" aria-label="Faster">🐇</button>
       </div>
-      <button id="btnResume" class="big">Keep flying!</button>
+      <button id="btnResume" class="big">Keep going!</button>
       <p><button id="btnPauseHome" class="link">Back to the start</button></p>
     </div>
   </div>
@@ -106,7 +110,7 @@
   <div id="menu" hidden>
     <div class="card menu-card">
       <h1><span>Olivia's</span> Word Road</h1>
-      <p class="sub">Listen, then fly through the right word!</p>
+      <p class="sub">Listen, then go through the right word!</p>
 
       <button id="btnPlay" class="big">Blast off! 🚀</button>
       <div class="fun-row">
@@ -160,7 +164,12 @@
       </section>
 
       <section>
-        <h3>Spaceship</h3>
+        <h3>World</h3>
+        <div id="worldChips" class="chips"></div>
+      </section>
+
+      <section id="playerSection">
+        <h3>Player</h3>
         <div id="shipChips" class="chips"></div>
       </section>
 

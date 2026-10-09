@@ -81,6 +81,10 @@ def main():
         index[key] = name
         print(f'{key:45s} {"/".join(ps for _, ps, _ in parts)}', flush=True)
 
+    # Drop clips for lines that no longer exist.
+    keys = {l['key'] for l in lines}
+    for key in [k for k in index if k not in keys]:
+        (OUT / index.pop(key)).unlink(missing_ok=True)
     index_path.write_text(json.dumps(dict(sorted(index.items())), indent=0))
     print(f'{len(index)} clips in {OUT}')
 

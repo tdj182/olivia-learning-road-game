@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import { ALL_WORDS, confusableNumbers } from './words.js';
+import { pickWord, pickDistractors } from './practice.js';
 import { settings, stats, saveStats, progress } from './state.js';
 import { inventory } from './potions.js';
 import { LINES, PRAISE, letterLine } from './lines.js';
+import { WORLDS, ROW_Y, RING_R, NEAR_Z } from './worlds.js';
 import { loadModel, normalize, burst, sfx, say, sayWord, hush, preloadVoice, flyEmoji, floatText, toScreen } from './fx.js';
 
 // ---------- Tuning ----------
@@ -13,12 +14,8 @@ export const speedFactor = level => 0.4 + level * 0.12;
 const STREAK_BOOST = 0.03;      // each right answer in a row adds 3% speed (up to 10 in a row)
 const SPAWN_Z = -105;           // where word rings appear
 const LETTER_SPAWN_Z = -75;     // Spell it mode: letter rings come closer together
-const NEAR_Z = 14;              // things behind the camera get removed
-const STAR_SPAN = 220;
-// The ship flies left and right only, along one row at height ROW_Y.
-const ROW_Y = 2.4;
+// The player moves left and right only, along one row at height ROW_Y (worlds.js).
 const AREA = { x: 4.6, yMin: ROW_Y, yMax: ROW_Y };
-const RING_R = 1.35;
 // Steering help (the Steering setting). reach: how far from a ring's center still counts as
 // flying through it. pull: how strongly the ship is drawn into the ring it's lined up with as
 // the ring arrives (0 = none). Easy also puts 3 rings in one row.
@@ -49,16 +46,7 @@ const LOOKALIKE = {
   h: 'nk', a: 'oe', e: 'ac', o: 'ac', c: 'eo', s: 'zc', z: 's', g: 'qj', j: 'ig', y: 'vg', k: 'hx', x: 'k', r: 'n',
 };
 
-export const SHIPS = [
-  { file: 'Spaceship_BarbaraTheBee', icon: '🐝', name: 'Barbara the Bee' },
-  { file: 'Spaceship_FernandoTheFlamingo', icon: '🦩', name: 'Fernando the Flamingo' },
-  { file: 'Spaceship_FinnTheFrog', icon: '🐸', name: 'Finn the Frog' },
-  { file: 'Spaceship_RaeTheRedPanda', icon: '🦊', name: 'Rae the Red Panda' },
-];
-// Facing fix for the ship models (verified visually).
-const SHIP_YAW = Math.PI;
-
-// Word practice: fly the spaceship through the ring with the spoken word.
+// Word practice: steer through the ring with the spoken word. The look comes from worlds.js.
 export function createFlight({ renderer }) {
   const $ = id => document.getElementById(id);
   const ui = {
@@ -69,87 +57,65 @@ export function createFlight({ renderer }) {
   };
 
   // ---------- Scene ----------
-  const SPACE = new THREE.Color('#160c3a');
   const scene = new THREE.Scene();
-  scene.background = SPACE;
-  scene.fog = new THREE.Fog(SPACE, 70, 150);
+  scene.fog = new THREE.Fog('#000', 70, 150);
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 400);
   const camBase = new THREE.Vector3(0, 5, 9);
-
-  scene.add(new THREE.HemisphereLight('#ffffff', '#5a3d8a', 1.8));
+  const hemi = new THREE.HemisphereLight('#ffffff', '#5a3d8a', 1.8);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight('#fff3dc', 2.4);
   sun.position.set(-6, 10, 8);
   scene.add(sun);
 
-  // Star field that streams past
-  const STAR_COUNT = 1400;
-  const starPos = new Float32Array(STAR_COUNT * 3);
-  const starCol = new Float32Array(STAR_COUNT * 3);
-  const tint = new THREE.Color();
-  for (let i = 0; i < STAR_COUNT; i++) {
-    starPos[i * 3] = (Math.random() - 0.5) * 140;
-    starPos[i * 3 + 1] = (Math.random() - 0.4) * 80;
-    starPos[i * 3 + 2] = NEAR_Z - Math.random() * STAR_SPAN;
-    tint.set(['#ffffff', '#ffffff', '#ffe9a8', '#a8d8ff', '#ffb3e1'][i % 5]);
-    starCol.set([tint.r, tint.g, tint.b], i * 3);
-  }
-  const starGeo = new THREE.BufferGeometry();
-  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-  starGeo.setAttribute('color', new THREE.BufferAttribute(starCol, 3));
-  const starField = new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 0.35, vertexColors: true, fog: false }));
-  scene.add(starField);
+  const ship = new THREE.Group(); // the player: spaceship, truck or dinosaur
+  ship.position.set(0, ROW_Y, 0);
+  scene.add(ship);
+  let world = null;
+  let player = null;
 
-  // ---------- Models ----------
-  let ship = null;          // wrapper that moves around
-  let shipModels = [];
-  let rockProtos = [];
-  const planets = [];
-  let ready = null;
+  const playerIndex = id => settings.players?.[id] ?? (id === 'space' ? settings.ship : 0) ?? 0;
 
-  function load() {
-    ready ??= Promise.all([
-      ...SHIPS.map(s => loadModel(`assets/models/space/${s.file}.gltf`)),
-      ...['Planet_1', 'Planet_3', 'Planet_6', 'Planet_9', 'Rock_1', 'Rock_Large_2'].map(n => loadModel(`assets/models/space/${n}.gltf`)),
-    ]).then(gltfs => {
-      const shipGltfs = gltfs.slice(0, SHIPS.length);
-      const [p1, p3, p6, p9, r1, r2] = gltfs.slice(SHIPS.length);
-      shipModels = shipGltfs.map(g => {
-        const m = g.scene;
-        m.rotation.y = SHIP_YAW;
-        const w = normalize(m, { length: 1.7 });
-        w.children[0].position.y -= new THREE.Box3().setFromObject(w).getSize(new THREE.Vector3()).y / 2;
-        return w;
-      });
-      ship = new THREE.Group();
-      ship.position.set(0, ROW_Y, 0);
-      scene.add(ship);
-      setShip(settings.ship);
-
-      [p1, p3, p6, p9, p1, p6].forEach((g, i) => {
-        const p = normalize(i < 4 ? g.scene : g.scene.clone(), { height: 1 });
-        p.scale.setScalar(10 + Math.random() * 12);
-        const side = i % 2 ? 1 : -1;
-        p.position.set(side * (50 + Math.random() * 25), -20 + Math.random() * 45, NEAR_Z - 20 - (i / 6) * STAR_SPAN);
-        p.userData.spin = (Math.random() - 0.5) * 0.3;
-        scene.add(p);
-        planets.push(p);
-      });
-      rockProtos = [r1, r2].map(g => normalize(g.scene, { height: 1.6 }));
+  async function setWorld(id) {
+    const next = WORLDS[id] ?? WORLDS.space;
+    next.ready ??= next.load();
+    await next.ready;
+    if (world === next) return;
+    if (world) scene.remove(world.group);
+    world = next;
+    scene.add(world.group);
+    scene.background = new THREE.Color(world.sky);
+    scene.fog.color.set(world.sky);
+    [scene.fog.near, scene.fog.far] = world.fog;
+    hemi.color.set(world.hemi[0]);
+    hemi.groundColor.set(world.hemi[1]);
+    laserMat.color.set(world.laser);
+    trailMats.forEach((m, i) => {
+      m.color.set(world.trail.colors[i % world.trail.colors.length]);
+      m.blending = world.trail.glow ? THREE.AdditiveBlending : THREE.NormalBlending;
+      m.opacity = world.trail.glow ? 0.7 : 0.55;
+      m.needsUpdate = true;
     });
-    return ready;
+    trailGeo.dispose();
+    trailGeo = new THREE.PlaneGeometry(world.trail.size, world.trail.size);
+    clearObstacles();
+    setPlayer(playerIndex(id));
   }
 
-  function setShip(i) {
-    if (!ship) return;
+  function setPlayer(i) {
+    if (!world) return;
+    player = world.players[i] ?? world.players[0];
     ship.clear();
-    ship.add(shipModels[i] ?? shipModels[0]);
+    ship.add(player.model);
   }
 
-  // Engine trail
+  const load = () => setWorld(settings.world);
+
+  // Engine flame or dust trail
   const trail = [];
-  const trailGeo = new THREE.PlaneGeometry(0.2, 0.2);
-  const trailMats = ['#ffd23f', '#ff9f43', '#ff6fa8'].map(c => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }));
+  let trailGeo = new THREE.PlaneGeometry(0.2, 0.2);
+  const trailMats = [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }));
   let trailIn = 0;
+  const laserMat = new THREE.MeshBasicMaterial({ color: '#7ff6ff', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
 
   // ---------- Word cards ----------
   function roundRect(g, x, y, w, h, r) {
@@ -211,7 +177,7 @@ export function createFlight({ renderer }) {
     g.traverse(o => {
       if (o === halo) return;
       if (o.material?.map) o.material.map.dispose();
-      if (o.material && !trailMats.includes(o.material)) o.material.dispose?.();
+      if (o.material) o.material.dispose?.();
     });
   }
 
@@ -266,32 +232,8 @@ export function createFlight({ renderer }) {
     boostLeft = BOOST_TIME;
   }
 
-  function weightFor(word) {
-    const s = stats[word] ?? { c: 0, m: 0 };
-    return 1 + s.m * 1.5 + (s.c === 0 ? 1 : 0) - Math.min(s.c, 4) * 0.15;
-  }
-
   function pickTarget() {
-    if (game.retry) return game.retry;
-    const choices = game.pool.length > 1 ? game.pool.filter(w => w !== game.lastTarget) : game.pool;
-    const weights = choices.map(weightFor);
-    let r = Math.random() * weights.reduce((a, b) => a + b, 0);
-    for (let i = 0; i < choices.length; i++) { r -= weights[i]; if (r <= 0) return choices[i]; }
-    return choices[choices.length - 1];
-  }
-
-  function pickDistractors(target, k) {
-    const shuffle = a => a.sort(() => Math.random() - 0.5);
-    if (/^\d+$/.test(target)) {
-      // One look-alike number (when there is one) plus others from the practice pool.
-      const tricky = shuffle(confusableNumbers(target)).slice(0, 1);
-      const rest = shuffle(game.pool.filter(n => n !== target && !tricky.includes(n)));
-      const all = shuffle(Array.from({ length: 100 }, (_, i) => String(i + 1)).filter(n => n !== target && !tricky.includes(n) && !rest.includes(n)));
-      return [...tricky, ...rest, ...all].slice(0, k);
-    }
-    const fromPool = shuffle(game.pool.filter(w => w !== target && w.toLowerCase() !== target.toLowerCase()));
-    const extra = shuffle(ALL_WORDS.filter(w => w !== target && !fromPool.includes(w)));
-    return [...fromPool, ...extra].slice(0, k);
+    return game.retry ?? pickWord(game.pool, game.lastTarget);
   }
 
   function spawnGate(labels, answer, kind, z) {
@@ -328,7 +270,7 @@ export function createFlight({ renderer }) {
       say([LINES.spell, target]);
       return;
     }
-    const words = [target, ...pickDistractors(target, choiceCount() - 1)].sort(() => Math.random() - 0.5);
+    const words = [target, ...pickDistractors(game.pool, target, choiceCount() - 1)].sort(() => Math.random() - 0.5);
     spawnGate(words, target, 'word', SPAWN_Z);
     ui.targetWord.textContent = settings.showWord ? target : '? ? ?';
     ui.targetWord.classList.toggle('hidden-word', !settings.showWord);
@@ -373,6 +315,7 @@ export function createFlight({ renderer }) {
     const p = chosen.getWorldPosition(new THREE.Vector3());
     burst(p, 50, undefined, scene);
     awardIngredient(p);
+    world.cheer?.(player);
     sfx.good();
     const streak = game.streak >= 3;
     const praise = streak ? `${game.streak} in a row!` : PRAISE[Math.floor(Math.random() * PRAISE.length)];
@@ -421,7 +364,7 @@ export function createFlight({ renderer }) {
       game.missesThisWord++;
       setStreak(0);
       sfx.oops();
-      showToast(`Whoops! Fly <b>through</b> a ring!`, 'oops');
+      showToast(`Whoops! Go <b>through</b> a ring!`, 'oops');
       say([LINES.missedRing, word]);
       game.nextRoundIn = NEXT_ROUND_DELAY + 1.4;
       return;
@@ -449,7 +392,7 @@ export function createFlight({ renderer }) {
       game.missesThisLetter++;
       setStreak(0);
       sfx.oops();
-      showToast(`Whoops! Fly <b>through</b> a letter!`, 'oops');
+      showToast(`Whoops! Go <b>through</b> a letter!`, 'oops');
       say([LINES.missedLetter, LINES.spell, word]);
       game.nextRoundIn = 1.4;
       return;
@@ -542,15 +485,17 @@ export function createFlight({ renderer }) {
   const gateNear = z => game.gate && !game.gate.evaluated && Math.abs(game.gate.group.position.z - z) < 16;
 
   function spawnRock() {
-    const proto = rockProtos[Math.floor(Math.random() * rockProtos.length)];
-    const r = proto.clone();
+    const protos = world.obstacles;
+    const r = protos[Math.floor(Math.random() * protos.length)].clone();
     // Half the rocks head straight for where the ship is now.
     const aimed = Math.random() < 0.5;
     const x = aimed ? ship.position.x + (Math.random() - 0.5) : (Math.random() * 2 - 1) * AREA.x;
-    const y = aimed ? ship.position.y + (Math.random() - 0.5) : AREA.yMin + Math.random() * (AREA.yMax - AREA.yMin);
-    r.position.set(THREE.MathUtils.clamp(x, -AREA.x, AREA.x), THREE.MathUtils.clamp(y, AREA.yMin, AREA.yMax) - 0.8, SPAWN_Z);
+    r.position.set(THREE.MathUtils.clamp(x, -AREA.x, AREA.x), world.obstacleY, SPAWN_Z);
     r.scale.setScalar(0.8 + Math.random() * 0.4);
-    r.userData = { spin: new THREE.Vector3(Math.random() * 2, Math.random() * 2, Math.random()), passed: false };
+    if (!world.floating) r.rotation.y = Math.random() * Math.PI * 2;
+    const spin = world.floating ? new THREE.Vector3(Math.random() * 2, Math.random() * 2, Math.random()) : new THREE.Vector3();
+    // cy: height of the obstacle's middle, for hits
+    r.userData = { spin, passed: false, cy: new THREE.Box3().setFromObject(r).getCenter(new THREE.Vector3()).y };
     scene.add(r);
     rocks.push(r);
   }
@@ -571,7 +516,7 @@ export function createFlight({ renderer }) {
     shake = 0.5;
     game.bonks++;
     sfx.bonk();
-    burst(rock.position.clone().add(new THREE.Vector3(0, 0.8, 0)), 30, ['#8a7f99', '#b9aec8', '#5d536b'], scene, 0.8);
+    burst(rock.position.clone().setY(rock.userData.cy), 30, ['#8a7f99', '#b9aec8', '#5d536b'], scene, 0.8);
     scene.remove(rock);
     rocks.splice(rocks.indexOf(rock), 1);
     ship.userData.spin = 1;
@@ -599,7 +544,6 @@ export function createFlight({ renderer }) {
 
   // ---------- Lasers ----------
   const laserGeo = new THREE.BoxGeometry(0.13, 0.13, 1.6);
-  const laserMat = new THREE.MeshBasicMaterial({ color: '#7ff6ff', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
   let laserSide = 1;
 
   function fire() {
@@ -607,7 +551,7 @@ export function createFlight({ renderer }) {
     fireCd = LASER_COOLDOWN;
     laserSide = -laserSide;
     const m = new THREE.Mesh(laserGeo, laserMat);
-    m.position.set(ship.position.x + laserSide * 0.45, ship.position.y, ship.position.z - 0.9);
+    m.position.set(ship.position.x + laserSide * 0.45, ship.position.y - (world.floating ? 0 : 0.6), ship.position.z - 0.9);
     scene.add(m);
     lasers.push(m);
     sfx.laser();
@@ -616,7 +560,7 @@ export function createFlight({ renderer }) {
 
   function blowUp(rock) {
     sfx.boom();
-    const c = rock.position.clone().add(new THREE.Vector3(0, 0.8, 0));
+    const c = rock.position.clone().setY(rock.userData.cy);
     burst(c, 40, ['#8a7f99', '#b9aec8', '#ff9f43', '#ffd23f'], scene, 1.1, 4);
     scene.remove(rock);
     rocks.splice(rocks.indexOf(rock), 1);
@@ -630,7 +574,7 @@ export function createFlight({ renderer }) {
       m.position.z -= LASER_SPEED * dt;
       const hit = rocks.find(r => !r.userData.passed
         && Math.abs(r.position.z - m.position.z) < 1.6
-        && Math.hypot(r.position.x - m.position.x, r.position.y + 0.8 - m.position.y) < 1.1);
+        && Math.hypot(r.position.x - m.position.x, r.userData.cy - m.position.y) < 1.2);
       if (hit) blowUp(hit);
       if (hit || m.position.z < SPAWN_Z) { scene.remove(m); lasers.splice(i, 1); }
     }
@@ -761,7 +705,8 @@ export function createFlight({ renderer }) {
     if (ship.userData.spin) ship.userData.spin = Math.max(0, ship.userData.spin - dt * 1.6);
     ship.rotation.z += (roll - ship.rotation.z) * Math.min(1, dt * 8);
     ship.rotation.x += (vy * 0.04 - ship.rotation.x) * Math.min(1, dt * 8);
-    ship.children[0] && (ship.children[0].position.y = Math.sin(t * 3) * 0.06);
+    if (world.floating && ship.children[0]) ship.children[0].position.y = Math.sin(t * 3) * 0.06;
+    if (!world.floating) ship.rotation.x = 0;
   }
 
   function updateTrail(dt, dz) {
@@ -769,7 +714,8 @@ export function createFlight({ renderer }) {
     if (ship && trailIn <= 0) {
       trailIn = boostLevel > 0.2 ? 0.015 : 0.035;
       const m = new THREE.Mesh(trailGeo, trailMats[trail.length % trailMats.length]);
-      m.position.set(ship.position.x + (Math.random() - 0.5) * 0.3, ship.position.y + (Math.random() - 0.5) * 0.15, ship.position.z + 0.9);
+      if (world.floating) m.position.set(ship.position.x + (Math.random() - 0.5) * 0.3, ship.position.y + (Math.random() - 0.5) * 0.15, ship.position.z + 0.9);
+      else m.position.set(ship.position.x + (Math.random() - 0.5) * 1.2, ROW_Y - RING_R + 0.15, ship.position.z + 1.1);
       m.userData.life = 0.35 + boostLevel * 0.35;
       scene.add(m);
       trail.push(m);
@@ -778,7 +724,8 @@ export function createFlight({ renderer }) {
       const m = trail[i];
       m.userData.life -= dt;
       m.position.z += dz * 0.6;
-      m.scale.setScalar(Math.max(0.01, m.userData.life * 2));
+      m.position.y += world.trail.rise * dt;
+      m.scale.setScalar(Math.max(0.01, world.floating ? m.userData.life * 2 : 1.6 - m.userData.life * 2));
       m.lookAt(camera.position);
       if (m.userData.life <= 0) { scene.remove(m); trail.splice(i, 1); }
     }
@@ -801,22 +748,11 @@ export function createFlight({ renderer }) {
   }
 
   function update(dt, t) {
-    if (!ship || dt <= 0) return;
+    if (!world || dt <= 0) return;
     if (game.paused) { updateCamera(0); return; }
     const dz = (game.playing ? worldSpeed() : BASE_SPEED * 0.5) * dt;
 
-    const pos = starGeo.attributes.position;
-    for (let i = 0; i < STAR_COUNT; i++) {
-      let z = pos.array[i * 3 + 2] + dz;
-      if (z > NEAR_Z) z -= STAR_SPAN;
-      pos.array[i * 3 + 2] = z;
-    }
-    pos.needsUpdate = true;
-    for (const p of planets) {
-      p.position.z += dz * 0.35;
-      p.rotation.y += p.userData.spin * dt;
-      if (p.position.z > NEAR_Z + 30) p.position.z -= STAR_SPAN + 40;
-    }
+    world.update(dt, dz, player);
 
     updateShip(dt, t);
     updateTrail(dt, dz);
@@ -887,7 +823,7 @@ export function createFlight({ renderer }) {
       r.rotation.y += r.userData.spin.y * dt;
       if (!r.userData.passed && r.position.z >= 0) {
         r.userData.passed = true;
-        if (Math.hypot(r.position.x - ship.position.x, r.position.y + 0.8 - ship.position.y) < ROCK_RADIUS) { bonk(r); continue; }
+        if (Math.hypot(r.position.x - ship.position.x, r.userData.cy - ship.position.y) < ROCK_RADIUS + (world.floating ? 0 : 0.35)) { bonk(r); continue; }
       }
       if (r.position.z > NEAR_Z) { scene.remove(r); rocks.splice(i, 1); }
     }
@@ -911,7 +847,8 @@ export function createFlight({ renderer }) {
   }
 
   return {
-    scene, camera, load, setShip,
+    scene, camera, load, setWorld, setPlayer,
+    get loadingText() { return (WORLDS[settings.world] ?? WORLDS.space).loading; },
     get target() { return game.target; },
     get paused() { return game.paused; },
     start(pool) {
@@ -937,7 +874,7 @@ export function createFlight({ renderer }) {
       rockIn = 4;
       gemIn = 8;
       aim.set(0, ROW_Y);
-      say([LINES.blastOff]);
+      say([world.start]);
       preloadVoice([LINES.find, LINES.spell, LINES.inARow, LINES.youSpelled, ...PRAISE, ...pool, ...new Set(pool.flatMap(w => [...w].map(letterLine)))]);
     },
     stop() {

@@ -18,7 +18,9 @@ export const settings = Object.assign(
     rocks: true,   // space rocks to dodge
     spell: false,  // hard mode: spell the word letter by letter
     steering: 'easy', // steering help: 'easy' | 'normal' | 'expert' (STEERING in flight.js)
-    ship: 0,       // index into SHIPS (flight.js)
+    ship: 0,       // first version's spaceship choice (now players.space)
+    world: 'space', // look of the word game: 'space' | 'road' | 'dino' (worlds.js)
+    players: {},   // world id -> chosen player index
   },
   store.get('owr-settings', {}),
 );

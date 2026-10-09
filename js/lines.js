@@ -5,7 +5,7 @@ import { ELEMENTS, INGREDIENTS, withArticle } from './ingredients.js';
 
 export const LINES = {
   find: 'Find',
-  missedRing: 'Whoops! Fly through the ring that says',
+  missedRing: 'Whoops! Go through the ring that says',
   oopsSays: 'Oops! That says',
   letsFind: "Let's find",
   again: 'again!',
@@ -13,8 +13,10 @@ export const LINES = {
   stars: 'stars!',
   cheerWords: 'Great reading, Olivia!',
   cheerNumbers: 'Great counting, Olivia!',
-  bonk: 'Bonk! Watch out for space rocks!',
+  bonk: 'Bonk! Watch out!',
   blastOff: 'Blast off, Olivia!',
+  letsDrive: "Let's drive, Olivia!",
+  letsRun: "Let's run, Olivia!",
   labWelcome: 'Welcome to the potion lab! Drag 3 things into the pot.',
   dragIt: 'Drag it into the pot!',
   thisMakes: 'This makes',
@@ -31,7 +33,10 @@ export const LINES = {
   thatsLetter: "Oops! That's",
   tryAgain: 'Try again!',
   youSpelled: 'You spelled',
-  missedLetter: 'Whoops! Fly through a letter!',
+  missedLetter: 'Whoops! Go through a letter!',
+  // Potion Lab magic word
+  magicWord: 'Now find the magic word.',
+  magicNumber: 'Now find the magic number.',
 };
 export const PRAISE = ['Great job!', 'You got it!', 'Awesome!', 'Super reading!', 'Yes!', 'Way to go!', 'Wonderful!'];
 export const BATTLE_WAVES = 5;

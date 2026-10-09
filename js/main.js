@@ -3,7 +3,8 @@ import { MODULES, NUMBER_RANGES, buildPool, buildNumberPool } from './words.js';
 import { settings, saveSettings, stats, progress, SPEED_LEVELS } from './state.js';
 import { inventory } from './potions.js';
 import { updateParticles, hush, loadVoice } from './fx.js';
-import { createFlight, SHIPS } from './flight.js';
+import { createFlight } from './flight.js';
+import { WORLDS, WORLD_ORDER } from './worlds.js';
 import { createLab } from './lab.js';
 import { createBattle } from './battle.js';
 
@@ -21,7 +22,7 @@ renderer.toneMappingExposure = 1.05;
 // ---------- Modes ----------
 let mode = 'menu'; // 'menu' | 'play' | 'lab' | 'battle'
 const flight = createFlight({ renderer });
-const lab = createLab({ onExit: exitTo, onBattle: enterBattle });
+const lab = createLab({ onExit: exitTo, onBattle: enterBattle, getPool: () => currentPool() });
 const battle = createBattle({ onExit: exitTo });
 const view = () => (mode === 'lab' ? lab : mode === 'battle' ? battle : flight);
 
@@ -141,16 +142,37 @@ function renderMenu() {
     b.onclick = () => { settings.steering = id; update(); };
     steerChips.appendChild(b);
   }
+  const worldChips = $('worldChips');
+  worldChips.innerHTML = '';
+  for (const id of WORLD_ORDER) {
+    const w = WORLDS[id];
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = `${w.icon} ${w.name}`;
+    b.setAttribute('aria-pressed', settings.world === id);
+    b.onclick = async () => {
+      settings.world = id;
+      update();
+      b.classList.add('loading');
+      await flight.setWorld(id).catch(err => console.error(err));
+      b.classList.remove('loading');
+      renderMenu();
+    };
+    worldChips.appendChild(b);
+  }
+  const world = WORLDS[settings.world] ?? WORLDS.space;
+  const current = settings.players[settings.world] ?? (settings.world === 'space' ? settings.ship : 0);
   const shipChips = $('shipChips');
   shipChips.innerHTML = '';
-  SHIPS.forEach((s, i) => {
+  $('playerSection').hidden = world.players.length < 2;
+  world.players.forEach((s, i) => {
     const b = document.createElement('button');
     b.className = 'chip ship-chip';
     b.textContent = s.icon;
     b.title = s.name;
     b.setAttribute('aria-label', s.name);
-    b.setAttribute('aria-pressed', settings.ship === i);
-    b.onclick = () => { settings.ship = i; flight.setShip(i); update(); };
+    b.setAttribute('aria-pressed', current === i);
+    b.onclick = () => { settings.players[settings.world] = i; flight.setPlayer(i); update(); };
     shipChips.appendChild(b);
   });
   renderSpeed();
@@ -251,6 +273,7 @@ function tick() {
 
 // ---------- Boot ----------
 (async () => {
+  ui.loading.querySelector('p').textContent = flight.loadingText;
   try {
     await Promise.all([document.fonts.load('700 100px Andika'), flight.load(), loadVoice()]);
   } catch (err) {

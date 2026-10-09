@@ -1,8 +1,14 @@
 # Olivia's Word Road
 
-A 3D space-flying game for practicing the HMH Into Reading kindergarten word list (Modules 1–9, irregular and decodable words), plus numbers 1–100.
+A 3D word game for practicing the HMH Into Reading kindergarten word list (Modules 1–9, irregular and decodable words), plus numbers 1–100.
 
-The game says a word out loud. Fly the spaceship through the ring with that word.
+The game says a word out loud. Steer through the ring with that word. On the start screen, pick a **World**:
+
+- 🚀 **Space:** fly a spaceship (pick 🐝 🦩 🐸 🦊) past planets and space rocks.
+- 🚚 **Road:** drive the truck down the road, with the dog running alongside. Dodge traffic cones.
+- 🦖 **Dinosaurs:** run as a T-Rex, Triceratops, Stegosaurus or Velociraptor down a jungle path past palm trees and volcanoes. Dodge rocks.
+
+Every world plays the same way. The scenery lives in `js/worlds.js`.
 
 - **Fly:** left and right only. The rings are always in one row. Use the joystick in the bottom-left corner, the ← → keys, or just **tap a ring** and the ship flies to it. When the rings are still far away and tiny, tapping the left, middle or right of the screen picks that ring.
 - The ring the ship is lined up with glows, so she can see which one she'll fly through.
@@ -21,13 +27,12 @@ The game says a word out loud. Fly the spaceship through the ring with that word
 - **Steering:** how much help she gets getting into a ring. **Easy** (the default): the ship is gently pulled into the ring it's lined up with, and the closest ring always counts. **Normal**: a lighter pull, and she has to be fairly close. **Expert**: no help; she has to fly right through the middle.
 - **Space rocks** on or off.
 - **✏️ Spell it (hard):** instead of finding the whole word, she spells it. Each ring has a letter, and she flies through the letters in order. The word at the top fills in as she goes. A wrong letter is read aloud ("Oops! That's n. Try again!") and that letter comes around again. Wrong choices are look-alike letters (b/d/p, m/n, i/l). Turn off **Show it** too, and she has to spell from listening alone.
-- **Spaceship:** 🐝 🦩 🐸 🦊.
 - **Words / Numbers**, modules or number groups, word types, and **Show it** (turn it off for listening only), same as before.
 
 ## Potions and Monster Battle (the reward loop)
 
 1. **Read to earn.** Each correct answer drops an ingredient into the basket under the stars.
-2. **Potion Lab 🧪.** Drag 3 ingredients from the tray into the cauldron (tap one in a slot to take it back). Then stir: swirl a finger around the pot 3 times while the ring fills up. Each brew makes **3 bottles**.
+2. **Potion Lab 🧪.** Drag 3 ingredients from the tray into the cauldron (tap one in a slot to take it back). Then stir: swirl a finger around the pot 3 times while the ring fills up. Last comes the **magic word**: word bubbles float up out of the pot, the voice says "Now find the magic word: *went*", and the potion is only finished when she taps the right one. It uses the same words and the same tricky-word tracking as the word game (numbers in Numbers mode). After two misses the right bubble pulses. Each brew makes **3 bottles**.
    Every ingredient has an element:
 
    | Element | Ingredients | In battle |
@@ -72,7 +77,9 @@ Plain HTML/JS with [three.js](https://threejs.org) copied into `vendor/`, so the
 
 **After adding or changing any game file, run `node tools/build-sw.mjs`.** It refreshes the offline file list and version in `sw.js`, which is how devices pick up the update. To run it locally: `python -m http.server`, then open http://localhost:8000 (add `#play`, `#lab` or `#battle` to jump straight to a mode).
 
-- `js/flight.js`: word practice (space flight)
+- `js/flight.js`: the word game
+- `js/worlds.js`: its looks (Space, Road, Dinosaurs)
+- `js/practice.js`: picking practice words (shared with the lab's magic word)
 - `js/lab.js`: Potion Lab
 - `js/battle.js`: Monster Battle. Tuning (HP, speeds, waves, potion power) is at the top.
 - `js/potions.js`: ingredients, elements, brewing

@@ -1,18 +1,23 @@
 import * as THREE from 'three';
 import { INGREDIENTS, ELEMENTS, RAINBOW, BOTTLES_PER_BREW, inventory, ingredientById, brew, makeBottle, bottleSvg } from './potions.js';
 import { withArticle } from './ingredients.js';
-import { LINES } from './lines.js';
+import { LINES, PRAISE } from './lines.js';
+import { ALL_WORDS } from './words.js';
+import { settings, stats, saveStats } from './state.js';
+import { pickWord, pickDistractors } from './practice.js';
 import { loadModel, normalize, burst, say, sfx, flyEmoji, toScreen } from './fx.js';
 
 const STIR_TURNS = 3; // full circles of stirring to finish a potion
 
-// Potion Lab: drag 3 ingredients into the cauldron, then stir it with your finger.
-export function createLab({ onExit, onBattle }) {
+// Potion Lab: drag 3 ingredients into the cauldron, stir it with your finger, then find the
+// magic word (a reading question) to finish the potion.
+export function createLab({ onExit, onBattle, getPool }) {
   const $ = id => document.getElementById(id);
   const el = {
     root: $('lab'), tray: $('labTray'), slots: $('labSlots'), msg: $('labMsg'),
     battle: $('btnLabBattle'), potions: $('labPotionCount'), learn: $('btnLabLearn'),
     ring: $('stirRing'), ringArc: $('stirArc'), canvas: $('c'),
+    magic: $('magic'), magicBubbles: $('magicBubbles'), magicPrompt: $('magicPrompt'),
   };
 
   // ---------- Scene ----------
@@ -258,7 +263,7 @@ export function createLab({ onExit, onBattle }) {
   // ---------- Stirring ----------
   let stirPointer = null;
   function onDown(e) {
-    if (!active || !full() || newBottles) return;
+    if (!active || !full() || newBottles || magic) return;
     stirPointer = e.pointerId;
     lastAngle = null;
     stirMove(e);
@@ -284,9 +289,63 @@ export function createLab({ onExit, onBattle }) {
       }
       if (stir === before) return;
       if (before === 0) render();
-      if (stir >= STIR_TURNS * Math.PI * 2) finishBrew();
+      if (stir >= STIR_TURNS * Math.PI * 2 && !magic) startMagic();
     }
     lastAngle = a;
+  }
+
+  // ---------- Magic word ----------
+  let magic = null; // { word, misses, prompt }
+  let lastMagic = null;
+
+  function startMagic() {
+    stirPointer = null;
+    el.ring.setAttribute('hidden', '');
+    const pool = getPool();
+    const words = pool.length ? pool : ALL_WORDS;
+    const word = pickWord(words, lastMagic);
+    lastMagic = word;
+    const numbers = /^\d+$/.test(word);
+    const n = Math.max(3, Math.min(5, settings.choices));
+    const choices = [word, ...pickDistractors(words, word, n - 1)].sort(() => Math.random() - 0.5);
+    magic = { word, misses: 0, prompt: numbers ? LINES.magicNumber : LINES.magicWord };
+    el.magicPrompt.textContent = numbers ? 'Find the magic number!' : 'Find the magic word!';
+    el.magicBubbles.innerHTML = '';
+    for (const w of choices) {
+      const b = document.createElement('button');
+      b.className = 'bubble';
+      b.textContent = w;
+      b.onclick = () => pickMagic(b, w);
+      el.magicBubbles.appendChild(b);
+    }
+    el.magic.hidden = false;
+    el.msg.textContent = 'Tap the magic word to finish your potion! ✨';
+    sfx.chirp();
+    say([magic.prompt, word]);
+  }
+
+  function pickMagic(button, w) {
+    if (!magic) return;
+    const s = (stats[magic.word] ??= { c: 0, m: 0 });
+    if (w === magic.word) {
+      if (!magic.misses) s.c++;
+      saveStats();
+      button.classList.add('pop');
+      burst(new THREE.Vector3(0, rimY + 0.6, 0), 40, ['#fff17a', '#ffffff', '#b57cff'], scene, 0.8);
+      sfx.good();
+      const praise = PRAISE[Math.floor(Math.random() * PRAISE.length)];
+      say([praise, w]);
+      magic = null;
+      setTimeout(() => { el.magic.hidden = true; if (active) finishBrew(); }, 600);
+      return;
+    }
+    if (!magic.misses) s.m++;
+    saveStats();
+    magic.misses++;
+    button.classList.add('wrong');
+    sfx.oops();
+    say([LINES.oopsSays, w, LINES.letsFind, magic.word, LINES.again]);
+    if (magic.misses >= 2) [...el.magicBubbles.children].find(b => b.textContent === magic.word)?.classList.add('hint');
   }
 
   function finishBrew() {
@@ -309,7 +368,7 @@ export function createLab({ onExit, onBattle }) {
     sfx.brew();
     setTimeout(sfx.fanfare, 600);
     el.msg.innerHTML = `${bottleSvg(potion, 40)}<span>You made ${BOTTLES_PER_BREW} <b>${potion.name}s</b>!</span>`;
-    say([LINES.youMade, `${potion.name}s!`]); // LINES.youMade says "three" (BOTTLES_PER_BREW)
+    say([LINES.youMade, `${potion.name}s!`], { interrupt: false }); // LINES.youMade says "three" (BOTTLES_PER_BREW)
     render();
   }
 
@@ -340,6 +399,7 @@ export function createLab({ onExit, onBattle }) {
   el.battle.onclick = () => onBattle();
   el.learn.onclick = () => onExit('learn');
   $('btnLabHome').onclick = () => onExit('menu');
+  $('btnMagicSay').onclick = () => { if (magic) say([magic.prompt, magic.word]); };
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
   window.addEventListener('pointercancel', onUp);
@@ -368,6 +428,8 @@ export function createLab({ onExit, onBattle }) {
       if (newBottles) { for (const o of newBottles.objs) scene.remove(o); newBottles = null; }
       el.root.hidden = true;
       el.ring.setAttribute('hidden', '');
+      el.magic.hidden = true;
+      magic = null;
     },
     resize(aspect) {
       camera.aspect = aspect;

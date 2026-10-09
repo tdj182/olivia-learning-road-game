@@ -368,3 +368,37 @@ section { margin-top: 20px; }
   .stick { width: 124px; height: 124px; }
   .fire-btn { width: 100px; height: 100px; font-size: 44px; }
 }
+
+.chip.loading { animation: pulse 0.8s ease-in-out infinite; }
+
+/* Potion Lab magic word */
+.magic {
+  position: absolute; left: 50%; top: 18%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 14px; pointer-events: auto;
+}
+.magic-title {
+  background: linear-gradient(135deg, #9b5de5, var(--pink)); color: #fff; border-radius: 22px; padding: 8px 20px;
+  font-size: 24px; font-weight: 800; box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px;
+}
+.magic-title .round { width: 44px; height: 44px; font-size: 20px; color: var(--ink); }
+.magic-bubbles { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.bubble {
+  min-width: 112px; padding: 14px 22px; border-radius: 999px; font-family: var(--font-read); font-weight: 700; font-size: 44px;
+  color: var(--ink); background: radial-gradient(circle at 35% 30%, #ffffff, #e9dcff 60%, #c9b2ff);
+  border: 4px solid #fff; box-shadow: 0 6px 0 rgba(107, 63, 176, 0.45), 0 10px 24px rgba(0,0,0,0.25);
+  animation: floaty 2.4s ease-in-out infinite;
+}
+.bubble:nth-child(2) { animation-delay: -0.8s; }
+.bubble:nth-child(3) { animation-delay: -1.6s; }
+.bubble:nth-child(4) { animation-delay: -0.4s; }
+.bubble:nth-child(5) { animation-delay: -1.2s; }
+.bubble.wrong { opacity: 0.35; filter: grayscale(1); animation: shakeX 0.4s ease; pointer-events: none; }
+.bubble.hint { animation: pulse 0.8s ease-in-out infinite; border-color: #ffd23f; }
+.bubble.pop { animation: popOut 0.35s ease forwards; }
+@keyframes floaty { 50% { transform: translateY(-10px); } }
+@keyframes popOut { to { transform: scale(1.6); opacity: 0; } }
+@media (max-width: 600px) {
+  .bubble { font-size: 34px; min-width: 90px; padding: 10px 16px; }
+  .magic { top: 14%; }
+  .magic-title { font-size: 19px; }
+}
