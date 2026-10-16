@@ -10,6 +10,39 @@ export const store = {
   },
 };
 
+// ---------- Start over (with a backup) ----------
+// Starting over clears her progress but keeps a copy for BACKUP_DAYS, in case it was an accident.
+// Settings (word lists, timer) are kept.
+const PROGRESS_KEYS = ['owr-farm', 'owr-pets', 'owr-battle', 'owr-stars', 'owr-stats'];
+export const BACKUP_DAYS = 3;
+const backupOld = b => Date.now() - b.at > BACKUP_DAYS * 86400e3;
+{
+  const b = store.get('owr-backup', null);
+  if (b && backupOld(b)) { try { localStorage.removeItem('owr-backup'); } catch { /* private mode */ } }
+}
+// The backup's date and when it will be deleted, or null.
+export function backupInfo() {
+  const b = store.get('owr-backup', null);
+  return b && !backupOld(b) ? { at: new Date(b.at), until: new Date(b.at + BACKUP_DAYS * 86400e3) } : null;
+}
+export function startOver() {
+  const data = {};
+  for (const k of PROGRESS_KEYS) { try { const v = localStorage.getItem(k); if (v !== null) data[k] = v; } catch { /* private mode */ } }
+  // Starting over twice shouldn't replace a real backup with a nearly empty one: keep the one with more stars.
+  const old = backupInfo() && store.get('owr-backup', null);
+  const stars = d => Number(d['owr-stars'] ?? 0);
+  if (!old || stars(data) >= stars(old.data)) store.set('owr-backup', { at: Date.now(), data });
+  for (const k of PROGRESS_KEYS) { try { localStorage.removeItem(k); } catch { /* private mode */ } }
+}
+export function restoreBackup() {
+  const b = store.get('owr-backup', null);
+  if (!b) return;
+  for (const k of PROGRESS_KEYS) {
+    try { if (k in b.data) localStorage.setItem(k, b.data[k]); else localStorage.removeItem(k); } catch { /* private mode */ }
+  }
+  try { localStorage.removeItem('owr-backup'); } catch { /* private mode */ }
+}
+
 const saved = store.get('owr-settings', {});
 export const settings = {
   mode: 'words', modules: [1, 2, 3, 4, 5, 6, 7, 8, 9], numberRanges: [1, 2], irregular: true, decodable: true,

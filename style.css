@@ -186,6 +186,10 @@ section { margin-top: 20px; }
   font-family: var(--font-read); font-weight: 700; font-size: 22px;
   background: #ffe3ee; border-radius: 12px; padding: 2px 12px;
 }
+.danger { margin-top: 18px; padding-top: 14px; border-top: 2px dashed #e6e2d6; }
+.danger .hint { margin: 0 0 10px; }
+.danger-btn[data-step="1"], .danger-btn[data-step="2"] { background: #ffe0e0; border-color: #e5484d; color: #b4232a; }
+#restoreBox { margin-top: 14px; }
 .pill {
   background: var(--card); border-radius: 30px; padding: 10px 20px; font-size: 20px; font-weight: 800;
   box-shadow: var(--shadow); border: 3px solid #d6f5e1; margin-top: 10px;

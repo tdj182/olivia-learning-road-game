@@ -42,6 +42,7 @@ Once she has a pet, the **⚔️ Battle** button (bottom right of the pet yard) 
 - **Words / Numbers**, modules or number groups, and irregular/decodable word types.
 - **Choices each time:** 3, 4 or 5.
 - Words to practice (the ones she misses most) and total stars.
+- **Start over:** takes 3 taps in a row. It clears the farm, pets, battles, stars and word stats, and keeps your settings. A backup is kept for 3 days, and **Restore** (2 taps) shows in settings until it expires. If Start over is used again during those days, the backup with more stars is kept.
 
 ## Voice
 

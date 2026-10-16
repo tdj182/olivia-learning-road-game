@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { MODULES, NUMBER_RANGES, buildPool, buildNumberPool } from './words.js';
-import { settings, saveSettings, stats, progress, pets as petState, battle as battleState, ready } from './state.js';
+import { settings, saveSettings, stats, progress, pets as petState, battle as battleState, ready, startOver, restoreBackup, backupInfo, BACKUP_DAYS } from './state.js';
 import { updateParticles, hush, loadVoice, sfx, say } from './fx.js';
 import { LINES } from './lines.js';
 import { createFarm } from './farm.js';
@@ -133,7 +133,36 @@ function renderSettings() {
     .slice(0, 10);
   $('trickySection').hidden = !tricky.length;
   $('tricky').innerHTML = tricky.map(([w]) => `<span>${w}</span>`).join('');
+  renderBackup();
 }
+
+// ---------- Start over / restore ----------
+// Start over takes 3 taps in a row (it forgets after a pause). Restore takes 2.
+const day = d => d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+function renderBackup() {
+  const b = backupInfo();
+  $('restoreBox').hidden = !b;
+  if (b) $('restoreInfo').textContent = `Backup from ${day(b.at)}. Restoring replaces the current progress. The backup is deleted ${day(b.until)}.`;
+}
+function multiTap(button, labels, action) {
+  let step = 0, timer = null;
+  const set = n => { step = n; button.dataset.step = n; button.textContent = labels[n]; };
+  button.onclick = () => {
+    clearTimeout(timer);
+    if (step + 1 < labels.length) { set(step + 1); timer = setTimeout(() => set(0), 4000); return; }
+    set(0);
+    action();
+  };
+  set(0);
+}
+multiTap($('btnStartOver'), ['🗑️ Start over', 'Are you sure? Tap again', `Tap once more to clear (backup kept ${BACKUP_DAYS} days)`], () => {
+  startOver();
+  location.reload();
+});
+multiTap($('btnRestore'), ['↩️ Restore', 'Tap again to restore the backup'], () => {
+  restoreBackup();
+  location.reload();
+});
 
 function update() {
   saveSettings();
