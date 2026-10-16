@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { MODULES, NUMBER_RANGES, buildPool, buildNumberPool } from './words.js';
-import { settings, saveSettings, stats, progress, pets as petState, battle as battleState } from './state.js';
-import { updateParticles, hush, loadVoice, sfx } from './fx.js';
+import { settings, saveSettings, stats, progress, pets as petState, battle as battleState, ready } from './state.js';
+import { updateParticles, hush, loadVoice, sfx, say } from './fx.js';
+import { LINES } from './lines.js';
 import { createFarm } from './farm.js';
 import { createPets } from './pets.js';
 import { createBattle } from './battle.js';
@@ -50,7 +51,11 @@ function switchMode(to = mode === pets ? farm : pets) {
   updateModeButton();
 }
 $('btnMode').onclick = () => switchMode();
-$('btnBattle').onclick = () => switchMode(battle);
+$('btnBattle').onclick = () => {
+  if (petState.owned.some(ready)) return switchMode(battle);
+  sfx.oops();
+  say([LINES.allTired]);
+};
 
 // ---------- Grown-up settings ----------
 function openSettings() {

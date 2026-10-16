@@ -1,5 +1,5 @@
 // Settings, word stats, stars, the farm and the pets, saved in the browser.
-import { CREATURES, BELLY_MAX, BELLY_HOURS, EGG_EVERY } from './creatures.js';
+import { CREATURES, BELLY_MAX, BELLY_HOURS, EGG_EVERY, HEAL_HOURS, READY_HP, petHp } from './creatures.js';
 
 export const store = {
   get(key, fallback) {
@@ -39,7 +39,7 @@ while (farm.plots.length < PLOTS) farm.plots.push({ crop: null, word: null, stag
 export const saveFarm = () => store.set('owr-farm', farm);
 
 // eggs: waiting in the nest (the first one is free). cracks: progress on the next egg.
-// picked: crops picked toward the next egg. owned: { id, hearts, evolved, belly, at } per pet.
+// picked: crops picked toward the next egg. owned: { id, hearts, evolved, belly, at, hurt, hurtAt } per pet.
 export const pets = Object.assign({ eggs: 1, cracks: 0, picked: 0, owned: [] }, store.get('owr-pets', {}));
 export const savePets = () => store.set('owr-pets', pets);
 
@@ -49,8 +49,28 @@ export function belly(p) {
   return Math.max(0, Math.min(BELLY_MAX, p.belly - gone));
 }
 export function setBelly(p, n) {
+  settle(p); // healing so far used the old belly
   p.belly = n;
   p.at = Date.now();
+}
+
+// Health: hurt is the damage left from battles at hurtAt. It heals while the belly has food
+// (the belly is empty from at + belly * BELLY_HOURS on).
+const HOUR = 3600e3;
+export function hurt(p) {
+  if (!p.hurt) return 0;
+  const fedMs = Math.max(0, Math.min(Date.now(), p.at + p.belly * BELLY_HOURS * HOUR) - p.hurtAt);
+  return Math.max(0, p.hurt - petHp(p) * fedMs / (HEAL_HOURS * HOUR));
+}
+function settle(p) {
+  p.hurt = Math.round(hurt(p) * 10) / 10;
+  p.hurtAt = Date.now();
+}
+export const health = p => Math.max(0, Math.floor(petHp(p) - hurt(p)));
+export const ready = p => health(p) >= petHp(p) * READY_HP;
+export function setHealth(p, hp) {
+  settle(p);
+  p.hurt = Math.max(0, petHp(p) - hp);
 }
 
 // stage: battles won so far (the monster is ENEMIES[stage % ENEMIES.length]).

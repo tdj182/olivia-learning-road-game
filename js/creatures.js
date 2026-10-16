@@ -46,6 +46,12 @@ export const TEAM = 3;
 export const petHp = p => 40 + 3 * p.hearts + (p.evolved ? 25 : 0);
 export const petHit = p => 10 + 1.5 * p.hearts + (p.evolved ? 8 : 0);
 export const HUNGRY_HIT = 0.75;
+// Healing after battles: a pet heals from tired (no health) to full in HEAL_HOURS, but only while
+// it has food in its belly. Each feeding also heals FEED_HEAL of its health right away.
+// A pet needs at least READY_HP of its health to fight.
+export const HEAL_HOURS = 2;
+export const FEED_HEAL = 0.25;
+export const READY_HP = 0.25;
 // Three right in a row (first try) is a super attack: double damage.
 export const COMBO = 3;
 // Grown-up setting: how long she has per word (multiplies each monster's time). 0 = no timer.

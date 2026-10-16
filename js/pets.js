@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CROPS } from './crops.js';
-import { CREATURES, creatureById, EVOLVE_AT, BELLY_MAX, CRACKS } from './creatures.js';
-import { farm, saveFarm, pets, savePets, belly, setBelly } from './state.js';
+import { CREATURES, creatureById, EVOLVE_AT, BELLY_MAX, CRACKS, FEED_HEAL, petHp } from './creatures.js';
+import { farm, saveFarm, pets, savePets, belly, setBelly, health, ready, setHealth } from './state.js';
 import { LINES, PRAISE } from './lines.js';
 import { loadModel, normalize, burst, sfx, say, flyEmoji, floatText, toScreen, CONFETTI } from './fx.js';
 import { ask, choosing, closeChoice, renderHud, bump } from './ui.js';
@@ -143,7 +143,7 @@ export function createPets({ getPool, onSettings, onChange }) {
 
     const badge = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false }));
     badge.renderOrder = 5;
-    badge.scale.set(1.9, 0.48, 1);
+    badge.scale.set(1.9, 0.74, 1);
     root.add(badge);
 
     Object.assign(pet, { data, c, hit, badge, target: null, wait: rand(0, 3), hold: 0 });
@@ -153,14 +153,27 @@ export function createPets({ getPool, onSettings, onChange }) {
     return pet;
   }
 
-  // Hearts toward evolving (babies), and a 🍎 when the pet is hungry.
+  // Hearts toward evolving (babies), a 🍎 when the pet is hungry, and a health bar
+  // under them while it's healing from a battle (💤 when it's too tired to fight).
   function drawBadge(pet) {
     const c = document.createElement('canvas');
-    c.width = 384; c.height = 96;
+    c.width = 384; c.height = 150;
     const g = c.getContext('2d');
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.font = '40px sans-serif';
     const hungry = belly(pet.data) === 0;
+    const max = petHp(pet.data), hp = health(pet.data);
+    if (hp < max) {
+      const tired = !ready(pet.data);
+      const x = tired ? 120 : 92, w = 200, y = 96;
+      g.fillStyle = 'rgba(255, 253, 246, 0.9)';
+      g.beginPath(); g.roundRect(x - 8, y - 8, w + 16, 40, 20); g.fill();
+      g.fillStyle = '#e6e2d6';
+      g.beginPath(); g.roundRect(x, y, w, 24, 12); g.fill();
+      g.fillStyle = tired ? '#ff9f43' : '#2fb565';
+      g.beginPath(); g.roundRect(x, y, Math.max(24, w * hp / max), 24, 12); g.fill();
+      if (tired) g.fillText('💤', x - 40, y + 13);
+    }
     if (!pet.data.evolved) {
       const n = EVOLVE_AT, w = 46, x0 = 192 - (n - 1) * w / 2 - (hungry ? 28 : 0);
       g.fillStyle = 'rgba(255, 253, 246, 0.9)';
@@ -175,6 +188,7 @@ export function createPets({ getPool, onSettings, onChange }) {
     pet.badge.material.map.colorSpace = THREE.SRGBColorSpace;
     pet.badge.material.needsUpdate = true;
     pet.hungry = hungry;
+    pet.shownHp = hp;
   }
 
   function randomSpot() {
@@ -354,6 +368,7 @@ export function createPets({ getPool, onSettings, onChange }) {
       const d = pet.data;
       setBelly(d, belly(d) + 1);
       d.hearts++;
+      setHealth(d, health(d) + petHp(d) * FEED_HEAL); // food heals
       savePets();
       drawBadge(pet);
       play(pet, 'eat');
@@ -440,8 +455,11 @@ export function createPets({ getPool, onSettings, onChange }) {
       if (k >= 1) anims.splice(i, 1);
     }
     egg.position.y = 0.85 + (pets.cracks ? Math.max(0, Math.sin(t * 7)) * 0.04 * pets.cracks : 0);
-    // Bellies empty over time, so redraw the 🍎 now and then.
-    if ((badgeClock += dt) > 10) { badgeClock = 0; live.forEach(p => { if ((belly(p.data) === 0) !== p.hungry) drawBadge(p); }); }
+    // Bellies empty and pets heal over time, so redraw the badges now and then.
+    if ((badgeClock += dt) > 5) {
+      badgeClock = 0;
+      live.forEach(p => { if ((belly(p.data) === 0) !== p.hungry || health(p.data) !== p.shownHp) drawBadge(p); });
+    }
 
     // Pets gently push apart so none hides behind another.
     for (let i = 0; i < live.length; i++) {
@@ -458,7 +476,7 @@ export function createPets({ getPool, onSettings, onChange }) {
     for (const pet of live) {
       pet.mixer.update(dt);
       pet.body.position.y = pet.c.fly ? FLY_Y + Math.sin(t * 2 + pet.h * 3) * 0.12 : 0;
-      pet.badge.position.y = pet.h + (pet.c.fly ? FLY_Y : 0) + 0.45 + Math.sin(t * 2.4 + pet.h) * 0.05;
+      pet.badge.position.y = pet.h + (pet.c.fly ? FLY_Y : 0) + 0.6 + Math.sin(t * 2.4 + pet.h) * 0.05;
       if (pet === focus) pet.hold = Math.max(pet.hold, 0.5);
       if (pet.hold > 0) {
         // Stand still and turn to look at her.
@@ -471,7 +489,7 @@ export function createPets({ getPool, onSettings, onChange }) {
       }
       if (!pet.target) {
         pet.wait -= dt;
-        if (pet.wait <= 0) { pet.target = randomSpot(); play(pet, 'move'); }
+        if (pet.wait <= 0 && ready(pet.data)) { pet.target = randomSpot(); play(pet, 'move'); } // tired pets rest
         continue;
       }
       const to = pet.target.clone().sub(pet.root.position);

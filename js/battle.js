@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {
   creatureById, ENEMIES, LAP_POWER, TEAM, petHp, petHit, HUNGRY_HIT, COMBO, BATTLE_SPEEDS, WIN_STARS,
 } from './creatures.js';
-import { pets, savePets, belly, setBelly, battle, saveBattle, settings, progress } from './state.js';
+import { pets, savePets, belly, setBelly, health, ready, setHealth, battle, saveBattle, settings, progress } from './state.js';
 import { LINES } from './lines.js';
 import { loadModel, normalize, burst, sfx, say, floatText, toScreen, CONFETTI } from './fx.js';
 import { ask, choosing, closeChoice, renderHud, sayTarget } from './ui.js';
@@ -92,7 +92,7 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     return { e, hp: Math.round(e.hp * k), hit: Math.round(e.hit * k), lap };
   };
   const limit = () => (foe ? foe.e.time * BATTLE_SPEEDS[settings.battleSpeed] : 0);
-  const power = p => petHp(p) + petHit(p) * 3;
+  const power = p => health(p) + petHit(p) * 3;
 
   async function spawn(file, height, at, fly) {
     const f = buildCreature(await loadModel(file), height);
@@ -114,8 +114,11 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     foeBusy = false;
     combo = 0;
     clear();
-    team = [...pets.owned].sort((a, b) => power(b) - power(a)).slice(0, TEAM)
-      .map(data => ({ data, c: creatureById(data.id), hp: petHp(data), max: petHp(data) }));
+    // The strongest pets that are rested enough to fight, with the health they have now.
+    team = pets.owned.filter(ready).sort((a, b) => power(b) - power(a)).slice(0, TEAM)
+      .map(data => ({ data, c: creatureById(data.id), hp: health(data), max: petHp(data) }));
+    if (!team.length) { say([LINES.allTired]); phase = 'off'; return onEnd(); }
+    saved = false;
     const { e, hp, hit } = enemyFor(battle.stage);
     $('battleBars').hidden = false;
     $('bFoeName').textContent = e.boss ? `👑 ${e.name.replace(/^the /, '')}` : e.name;
@@ -261,9 +264,15 @@ export function createBattle({ getPool, onSettings, onEnd }) {
   }
 
   // ---------- Endings ----------
+  // Pets keep the damage they took (it heals with food and time), and fighting makes them hungry.
+  let saved = true;
   function afterBattle() {
-    // Fighting makes pets hungry.
-    for (const m of team) setBelly(m.data, Math.max(0, belly(m.data) - 1));
+    if (saved) return;
+    saved = true;
+    for (const m of team) {
+      setHealth(m.data, m.hp);
+      setBelly(m.data, Math.max(0, belly(m.data) - 1));
+    }
     savePets();
   }
 
@@ -306,6 +315,8 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     $('beText').textContent = won ? `+${WIN_STARS} ⭐` : 'Feed your pets and try again!';
     const next = enemyFor(battle.stage);
     $('beAgain').textContent = won ? `Next: ${next.e.boss ? '👑 ' : ''}${next.e.name.replace(/^the /, '')} ⚔️` : 'Try again ⚔️';
+    $('beAgain').hidden = !pets.owned.some(ready);
+    if (!won && $('beAgain').hidden) $('beText').textContent = 'Your pets need food and rest!';
   }
   $('beAgain').onclick = () => { $('battleEnd').hidden = true; sfx.pop(); start(); };
   $('beBack').onclick = () => { $('battleEnd').hidden = true; onEnd(); };
@@ -338,6 +349,7 @@ export function createBattle({ getPool, onSettings, onEnd }) {
   }
 
   function stop() {
+    if (phase === 'intro' || phase === 'fight') afterBattle(); // running away still counts
     run++;
     phase = 'off';
     closeChoice();

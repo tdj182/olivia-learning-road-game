@@ -28,6 +28,7 @@ export const LINES = {
   tooSlow: 'Too slow!',
   superAttack: 'Super attack!',
   tired: 'Your pet is tired!',
+  allTired: 'Your pets are too tired to fight! Feed them and let them rest.',
   won: 'You won! Your pets are so strong!',
   lost: 'Oh no! The monster won. Feed your pets and try again!',
 };

@@ -32,9 +32,10 @@ Once she has a pet, the **⚔️ Battle** button (bottom right of the pet yard) 
 - ⏱ A wrong tap, or running out of time (the bar under the monster's health), lets the monster attack her pet.
 - 😴 A pet with no health left is tired and the next pet comes in. When all of them are tired, the monster wins. Pets are never hurt for good.
 - 🏆 A win gives 3 ⭐ and unlocks the next monster. There are 8: Blobby, Prickles, Hopper, Squiddy, Boo, Ninja, Grumble, and the Mushroom King (boss). After the boss the ladder starts over, with each monster 40% tougher.
+- 🩹 **Healing:** pets keep the damage they took, and running away still counts. A pet heals from tired to full in 2 hours, but only while it has food in its belly, so a hungry pet doesn't heal. Each feeding also heals a quarter right away. A pet needs a quarter of its health to fight. In the yard, a health bar shows under a hurt pet, and 💤 means too tired to fight (tired pets rest instead of wandering). If every pet is tired, the ⚔️ button says to feed them and let them rest.
 - Pets with more ❤️ have more health and hit harder, and evolved pets much more so. A hungry pet (🍎) hits softer, and every battle makes the pets that fought hungrier. So farming and feeding matter.
 
-**Battle timer** (grown-up settings): Off, Slow, Normal or Fast. Normal gives 7–10 seconds per word depending on the monster. The settings also show how many battles she has won. Monster health, damage and time are in `ENEMIES` in `js/creatures.js`.
+**Battle timer** (grown-up settings): Off, Slow, Normal or Fast. Normal gives 7–10 seconds per word depending on the monster. The settings also show how many battles she has won. Monster health, damage and time are in `ENEMIES` in `js/creatures.js`, with healing (`HEAL_HOURS`, `FEED_HEAL`, `READY_HP`) below it.
 
 ### Grown-up settings (⚙️, top left)
 
