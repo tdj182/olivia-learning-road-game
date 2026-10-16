@@ -17,7 +17,6 @@ export const LINES = {
   plantMore: 'Plant another seed!',
   cheerWords: 'Great reading, Olivia!',
   cheerNumbers: 'Great counting, Olivia!',
-  foundEgg: 'You found an egg! Take it to your pets.',
   petsWelcome: 'These are your pets! Tap a pet to feed it.',
   eggWelcome: 'Tap the egg to hatch it!',
   crackWhich: 'Find the egg that says',
@@ -28,9 +27,14 @@ export const LINES = {
   tooSlow: 'Too slow!',
   superAttack: 'Super attack!',
   tired: 'Your pet is tired!',
-  allTired: 'Your pets are too tired to fight! Feed them and let them rest.',
   won: 'You won! Your pets are so strong!',
-  lost: 'Oh no! The monster won. Feed your pets and try again!',
+  wonEgg: 'You won! You got a new egg!',
+  lost: 'Oh no! The monster won. Heal your pets and try again!',
+  battleReady: "You're ready for the battle! Go to your pets.",
+  needLearn: 'Keep reading words to get ready for the battle!',
+  healPets: 'Heal your pets! Tap a pet to heal it.',
+  healed: 'All better!',
+  allHealed: 'All your pets are better!',
 };
 export const PRAISE = ['Great job!', 'You got it!', 'Awesome!', 'Super reading!', 'Yes!', 'Way to go!', 'Wonderful!'];
 

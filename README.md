@@ -12,37 +12,50 @@ Every patch in the garden has a word sign. Each step is **hear it, find it**: th
 
 Crops: carrot, pumpkin, watermelon, corn, tomato, lettuce (`js/crops.js`).
 
+## Rounds
+
+The game moves through the modules one round at a time: round 1 is Module 1, round 2 is Module 2, up to Module 9. In Numbers mode, round 1 is 1–10, round 2 is 11–20, and so on.
+
+1. **Learn:** farming, hatching the round's egg and feeding all use the round's words. The 📖 bar (top right) fills as she finds them. When every word has been found twice, the bar turns orange, ⚔️ lights up, and the game says she's ready for the battle.
+2. **Battle:** the round's battle unlocks once the round's egg has hatched, the words are learned, and every pet is fully healed. A locked ⚔️ button is grey, and tapping it says what's still needed.
+3. **Win:** she gets the next egg (her next pet) and moves on to the next round. Healing and feeding then **review every module so far** until all her pets are back to 100%.
+4. **Lose:** she stays on the round (the battle stays unlocked), heals her pets with **just this round's words**, and fights again.
+
+After the last round she keeps battling with all the words, and the monsters keep getting tougher. Round logic is in `js/quest.js`.
+
 ## Pets
 
 The **🐾 Pets** button (top left) goes to the pet yard, and **🌱 Farm** goes back.
 
-- 🥚 **Eggs:** the first egg is free, and she finds another every 4 crops she picks (a dot on the 🐾 button means one is waiting). Tap the egg in the nest and find 3 words ("Find the egg that says…") to crack it open. Each egg hatches a pet she doesn't have yet. There are 10.
-- 🍽️ **Feeding:** tap a pet and find the word on the food ("Find the food that says…"). Food comes from the basket, so she has to keep farming. Each feeding earns a ❤️.
+- 🥚 **Eggs:** the first egg is free, and every battle won gives the next one (a dot on the 🐾 button means something is waiting). Tap the egg in the nest and find 3 words ("Find the egg that says…") to crack it open. Each egg hatches a pet she doesn't have yet. There are 10.
+- 🩹 **Healing:** tap a hurt pet and find words to heal it. Each word heals a quarter, and it keeps going until the pet is all better. Studying is the only way pets heal. A health bar shows under a hurt pet, and 💤 means it has no health left (it rests instead of wandering).
+- 🍽️ **Feeding:** tap a healthy pet and find the word on the food ("Find the food that says…"). Food comes from the basket, so she has to keep farming. Each feeding earns a ❤️.
 - 🍎 **Hunger:** a pet's belly holds 3 meals and empties one every hour, so pets only eat (and earn hearts) when they're hungry. A full pet says "I'm full!" and dances. A 🍎 above a pet means it's empty.
 - ✨ **Evolving:** at 6 ❤️ a baby evolves into its big form.
 
-Pets and tuning (hearts to evolve, belly size and timing, eggs per crop, cracks per egg) are in `js/creatures.js`.
+Pets and tuning (hearts to evolve, belly size and timing, cracks per egg, healing per word) are in `js/creatures.js`.
 
 ## Battles
 
-Once she has a pet, the **⚔️ Battle** button (bottom right of the pet yard) sends her 3 strongest pets against a wild monster. Fighting *is* the reading:
+All her pets fight, one at a time (strongest first), against the round's monsters, one after another: 1 monster in round 1, 2 in round 2, and 3 from round 3 on. The monsters get tougher every round. Fighting *is* the reading:
 
 - ⚡ The game says a word ("Find the word that says…"). Finding it makes her pet attack. On the first try it's full damage. After a miss it's weaker.
 - 💥 Three first-try words in a row is a **super attack** (double damage).
-- ⏱ A wrong tap, or running out of time (the bar under the monster's health), lets the monster attack her pet.
-- 😴 A pet with no health left is tired and the next pet comes in. When all of them are tired, the monster wins, and the next battle starts back at the first monster (Blobby, or the first monster of a tougher round). Pets are never hurt for good.
-- 🏆 A win gives 3 ⭐ and unlocks the next monster. There are 8: Blobby, Prickles, Hopper, Squiddy, Boo, Ninja, Grumble, and the Mushroom King (boss). After the boss the ladder starts over, with each monster 40% tougher.
-- 🩹 **Healing:** pets keep the damage they took, and running away still counts. A pet heals from tired to full in 2 hours, but only while it has food in its belly, so a hungry pet doesn't heal. Each feeding also heals a quarter right away. A pet needs a quarter of its health to fight. In the yard, a health bar shows under a hurt pet, and 💤 means too tired to fight (tired pets rest instead of wandering). If every pet is tired, the ⚔️ button says to feed them and let them rest.
+- ⏱ A wrong tap, or running out of time (the bar under the monster's health), lets the monster attack her pet. Monsters also strike back after every 2 of her attacks, so even perfect reading takes some damage.
+- 😴 A pet with no health left is tired and the next pet comes in. When all of them are tired, the monsters win. Pets are never hurt for good, and running away still keeps the damage.
+- 🏆 A win gives 3 ⭐ and the next egg.
 - Pets with more ❤️ have more health and hit harder, and evolved pets much more so. A hungry pet (🍎) hits softer, and every battle makes the pets that fought hungrier. So farming and feeding matter.
 
-**Battle timer** (grown-up settings): Off, Slow, Normal or Fast. Normal gives 7–10 seconds per word depending on the monster. The settings also show how many battles she has won and which monster is next. Monster health, damage and time are in `ENEMIES` in `js/creatures.js`, with healing (`HEAL_HOURS`, `FEED_HEAL`, `READY_HP`) below it.
+The monsters, in order of toughness: Blobby, Prickles, Hopper, Squiddy, Boo, Ninja, Grumble, and the Mushroom King (boss). Their health, damage and time, how much tougher they get each round, and how often they strike back are in `js/creatures.js`.
 
 ### Grown-up settings (⚙️, top left)
 
-- **Words / Numbers**, modules or number groups, and irregular/decodable word types.
+- **Round:** shows the round, its module and words, and how far she is toward the battle. ◀ ▶ moves her to another round (it starts that round over).
+- **Words / Numbers**, and irregular/decodable word types.
 - **Choices each time:** 3, 4 or 5.
+- **Battle timer:** Off, Slow, Normal or Fast. Normal gives 7–10 seconds per word depending on the monster. It also shows battles won and this round's monsters.
 - Words to practice (the ones she misses most) and total stars.
-- **Start over:** takes 3 taps in a row. It clears the farm, pets, battles, stars and word stats, and keeps your settings. A backup is kept for 3 days, and **Restore** (2 taps) shows in settings until it expires. If Start over is used again during those days, the backup with more stars is kept.
+- **Start over:** takes 3 taps in a row. It clears the farm, pets, rounds, battles, stars and word stats, and keeps your settings. A backup is kept for 3 days, and **Restore** (2 taps) shows in settings until it expires. If Start over is used again during those days, the backup with more stars is kept.
 
 ## Voice
 
@@ -75,7 +88,8 @@ Plain HTML/JS with [three.js](https://threejs.org) copied into `vendor/`, so the
 
 - `js/farm.js`: the farm scene and the plant / water / pick game. Tuning at the top.
 - `js/crops.js`: crops and growth stages
-- `js/pets.js`: the pet yard: hatching, feeding, evolving
+- `js/quest.js`: rounds: which words, when the battle unlocks, winning and losing
+- `js/pets.js`: the pet yard: hatching, healing, feeding, evolving
 - `js/battle.js`: battles
 - `js/creature3d.js`: sizing and animating the monster models
 - `js/creatures.js`: the pets, the battle monsters, and their tuning

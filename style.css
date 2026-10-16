@@ -78,7 +78,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; }
 .basket { flex-wrap: wrap; justify-content: flex-end; max-width: 70vw; gap: 10px; }
 .basket span { display: inline-flex; align-items: center; gap: 2px; }
 .basket b { font-size: 0.8em; }
-.basket.bump, #stars.bump { animation: bump 0.5s ease; }
+.basket.bump, #stars.bump, #quest.bump { animation: bump 0.5s ease; }
 @keyframes bump { 40% { transform: scale(1.25); } }
 
 /* Battle */
@@ -90,7 +90,15 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; }
 }
 .battle-btn span { font-size: 36px; }
 .battle-btn:active { transform: translateY(3px); }
-#hud.battle #basket, #hud.battle #eggs { display: none; }
+#hud.battle #basket, #hud.battle #eggs, #hud.battle #quest { display: none; }
+.quest { gap: 8px; }
+.qbar { width: 110px; height: 18px; border-radius: 9px; background: #e6e2d6; overflow: hidden; }
+.qbar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #3fa7ff, #38c172); border-radius: 9px; transition: width 0.5s ease; }
+.qgo { opacity: 0.25; filter: grayscale(1); }
+.quest.ready .qgo { opacity: 1; filter: none; animation: pulse 0.9s ease-in-out infinite; }
+.quest.ready .qbar i { background: linear-gradient(90deg, #ffd23f, #ff7a45); }
+.battle-btn.locked { background: #b7b2a6; box-shadow: 0 6px 0 #8d887c, 0 12px 24px rgba(0,0,0,0.15); }
+.battle-btn.go { animation: pulse 0.9s ease-in-out infinite; }
 .battle-bars {
   position: absolute; left: 50%; transform: translateX(-50%); top: calc(max(14px, env(safe-area-inset-top)) + 76px);
   width: min(720px, calc(100% - 20px)); display: flex; align-items: flex-start; gap: 10px;
@@ -177,6 +185,8 @@ section { margin-top: 20px; }
 }
 .chip[aria-pressed="true"] { background: #fff4c4; border-color: var(--yellow); }
 .type-row { margin-top: 10px; }
+.round-row { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.round-row b { font-size: 22px; min-width: 190px; }
 .row-links { margin-top: 6px; display: flex; justify-content: center; gap: 16px; }
 .link { background: none; text-decoration: underline; font-size: 16px; opacity: 0.7; }
 .hint { margin: 8px 0 0; font-size: 16px; opacity: 0.75; }
@@ -213,6 +223,7 @@ section { margin-top: 20px; }
   .mode-btn { height: 52px; font-size: 22px; padding: 0 16px 0 10px; }
   .mode-btn .e { font-size: 26px; }
   .battle-btn { height: 60px; font-size: 24px; padding: 0 20px 0 14px; }
+  .qbar { width: 64px; }
   .fighter { padding: 6px 10px 8px; }
   .fname { font-size: 18px; }
   .vs { font-size: 18px; }

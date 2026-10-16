@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { CROPS } from './crops.js';
-import { CREATURES, creatureById, EVOLVE_AT, BELLY_MAX, CRACKS, FEED_HEAL, petHp } from './creatures.js';
-import { farm, saveFarm, pets, savePets, belly, setBelly, health, ready, setHealth } from './state.js';
+import { CREATURES, creatureById, EVOLVE_AT, BELLY_MAX, CRACKS, HEAL_WORD, petHp } from './creatures.js';
+import { farm, saveFarm, pets, savePets, belly, setBelly, health, setHealth } from './state.js';
+import { checkHealed } from './quest.js';
 import { LINES, PRAISE } from './lines.js';
 import { loadModel, normalize, burst, sfx, say, flyEmoji, floatText, toScreen, CONFETTI } from './fx.js';
 import { ask, choosing, closeChoice, renderHud, bump } from './ui.js';
@@ -21,7 +22,8 @@ const rand = (a, b) => a + Math.random() * (b - a);
 
 // The pet yard: pets she hatched wander around a fenced pen, with a nest of eggs to hatch.
 // Tap a pet to feed it (find the word on the food); tap the egg to crack it (find the word on the egg).
-export function createPets({ getPool, onSettings, onChange }) {
+// getPool: the round's words (hatching). getCarePool: words for healing and feeding.
+export function createPets({ getPool, getCarePool, onSettings, onChange }) {
   // ---------- Scene ----------
   const SKY = new THREE.Color('#a8ddff');
   const scene = new THREE.Scene();
@@ -164,7 +166,7 @@ export function createPets({ getPool, onSettings, onChange }) {
     const hungry = belly(pet.data) === 0;
     const max = petHp(pet.data), hp = health(pet.data);
     if (hp < max) {
-      const tired = !ready(pet.data);
+      const tired = hp === 0;
       const x = tired ? 120 : 92, w = 200, y = 96;
       g.fillStyle = 'rgba(255, 253, 246, 0.9)';
       g.beginPath(); g.roundRect(x - 8, y - 8, w + 16, 40, 20); g.fill();
@@ -330,11 +332,42 @@ export function createPets({ getPool, onSettings, onChange }) {
     onChange();
   }
 
+  // ---------- Healing ----------
+  // A hurt pet heals by studying: each word she finds heals HEAL_WORD of its health,
+  // and it keeps asking until the pet is all better (or she closes it).
+  function healPet(pet) {
+    const pool = getCarePool();
+    if (!pool.length) return onSettings();
+    focus = pet;
+    ask({
+      pool, title: `🩹 Heal ${pet.c.name}!`, line: LINES.attackWhich, cls: 'heal',
+      icon: () => '🩹',
+      done: () => {
+        const d = pet.data, max = petHp(d);
+        setHealth(d, Math.min(max, health(d) + max * HEAL_WORD));
+        savePets();
+        drawBadge(pet);
+        sfx.chirp();
+        burst(pet.root.position.clone().add(new THREE.Vector3(0, pet.h * 0.7 + (pet.c.fly ? FLY_Y : 0), 0)), 20, ['#5be38f', '#ffffff', '#ff8fb8'], scene, 0.5, 4);
+        const s = petScreen(pet);
+        floatText(`+${Math.round(max * HEAL_WORD)} 💚`, s.x, s.y - 40, 'good');
+        pet.hold = 3;
+        if (health(d) < max) { play(pet, 'yes'); setTimeout(() => healPet(pet), 700); return; }
+        focus = null;
+        play(pet, 'happy');
+        renderHud();
+        onChange();
+        say([checkHealed() ? LINES.allHealed : LINES.healed]);
+      },
+    });
+  }
+
   // ---------- Feeding ----------
   function tapPet(pet) {
     sfx.pop();
     pet.hold = 2.5;
     pet.target = null;
+    if (health(pet.data) < petHp(pet.data)) return healPet(pet);
     if (belly(pet.data) >= BELLY_MAX) {
       play(pet, 'happy');
       say([pet.c.name, LINES.full]);
@@ -346,7 +379,7 @@ export function createPets({ getPool, onSettings, onChange }) {
       say([LINES.noFood]);
       return;
     }
-    const pool = getPool();
+    const pool = getCarePool();
     if (!pool.length) return onSettings();
     focus = pet;
     ask({
@@ -367,8 +400,7 @@ export function createPets({ getPool, onSettings, onChange }) {
       renderHud();
       const d = pet.data;
       setBelly(d, belly(d) + 1);
-      d.hearts++;
-      setHealth(d, health(d) + petHp(d) * FEED_HEAL); // food heals
+      d.hearts++; // only full-health pets eat (hurt ones heal first), so they stay full
       savePets();
       drawBadge(pet);
       play(pet, 'eat');
@@ -423,6 +455,7 @@ export function createPets({ getPool, onSettings, onChange }) {
     showEgg();
     live.forEach(drawBadge);
     if (pets.eggs > 0 && (!pets.owned.length || pets.cracks > 0 || !greeted)) say([LINES.eggWelcome]);
+    else if (pets.owned.some(p => health(p) < petHp(p))) say([LINES.healPets]);
     else if (!greeted) say([LINES.petsWelcome]);
     greeted = true;
   }
@@ -489,7 +522,7 @@ export function createPets({ getPool, onSettings, onChange }) {
       }
       if (!pet.target) {
         pet.wait -= dt;
-        if (pet.wait <= 0 && ready(pet.data)) { pet.target = randomSpot(); play(pet, 'move'); } // tired pets rest
+        if (pet.wait <= 0 && health(pet.data) > 0) { pet.target = randomSpot(); play(pet, 'move'); } // tired pets rest
         continue;
       }
       const to = pet.target.clone().sub(pet.root.position);

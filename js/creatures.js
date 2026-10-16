@@ -20,41 +20,47 @@ export const EVOLVE_AT = 6;
 // Belly: each feeding fills one, and one empties every BELLY_HOURS. Hearts only come from feeding a hungry pet.
 export const BELLY_MAX = 3;
 export const BELLY_HOURS = 1;
-// She finds an egg every EGG_EVERY crops she picks.
-export const EGG_EVERY = 4;
 // Correct words to crack an egg open.
 export const CRACKS = 3;
 
 // ---------- Battle ----------
-// Wild monsters, one per stage, from assets/models/enemies/<model>.glb.
+// Wild monsters, from assets/models/enemies/<model>.glb, in order of toughness.
 // hp: health. hit: damage when it attacks. time: seconds she has to find each word before it attacks.
 export const ENEMIES = [
-  { id: 'blobby', name: 'Blobby', model: 'PinkBlob', hp: 40, hit: 8, time: 10, color: '#ff6fa8' },
-  { id: 'prickles', name: 'Prickles', model: 'GreenSpikyBlob', hp: 55, hit: 10, time: 10, color: '#38c172' },
-  { id: 'hopper', name: 'Hopper', model: 'Frog', hp: 70, hit: 12, time: 9, color: '#ffd23f' },
-  { id: 'squiddy', name: 'Squiddy', model: 'Squidle', fly: true, hp: 90, hit: 14, time: 9, color: '#b57cff' },
-  { id: 'boo', name: 'Boo', model: 'Ghost', fly: true, hp: 110, hit: 16, time: 8, color: '#9be7ff' },
-  { id: 'ninja', name: 'Ninja', model: 'Ninja', hp: 130, hit: 18, time: 8, color: '#555b7a' },
-  { id: 'grumble', name: 'Grumble', model: 'Orc', hp: 150, hit: 20, time: 7, color: '#7cb342' },
-  { id: 'king', name: 'the Mushroom King', model: 'MushroomKing', hp: 220, hit: 24, time: 7, color: '#3fa7ff', boss: true },
+  { id: 'blobby', name: 'Blobby', model: 'PinkBlob', hp: 65, hit: 12, time: 10, color: '#ff6fa8' },
+  { id: 'prickles', name: 'Prickles', model: 'GreenSpikyBlob', hp: 85, hit: 14, time: 10, color: '#38c172' },
+  { id: 'hopper', name: 'Hopper', model: 'Frog', hp: 110, hit: 17, time: 9, color: '#ffd23f' },
+  { id: 'squiddy', name: 'Squiddy', model: 'Squidle', fly: true, hp: 140, hit: 20, time: 9, color: '#b57cff' },
+  { id: 'boo', name: 'Boo', model: 'Ghost', fly: true, hp: 170, hit: 23, time: 8, color: '#9be7ff' },
+  { id: 'ninja', name: 'Ninja', model: 'Ninja', hp: 200, hit: 26, time: 8, color: '#555b7a' },
+  { id: 'grumble', name: 'Grumble', model: 'Orc', hp: 240, hit: 29, time: 7, color: '#7cb342' },
+  { id: 'king', name: 'the Mushroom King', model: 'MushroomKing', hp: 340, hit: 34, time: 7, color: '#3fa7ff', boss: true },
 ].map(e => ({ ...e, appears: e.boss ? `Oh no! It's ${e.name}!` : `A wild ${e.name} appears!` }));
-// After the last stage, the ladder starts over with tougher monsters (hp and hit times this, per lap).
-export const LAP_POWER = 1.4;
-// Pets in a battle team, strongest first.
-export const TEAM = 3;
+// Round N's battle: up to MAX_FOES monsters in a row (round 1: 1, round 2: 2, ...), the toughest last,
+// all stronger each round: health +ROUND_HP and hits +ROUND_HIT per round after the first.
+export const MAX_FOES = 3;
+export const ROUND_HP = 0.2;
+export const ROUND_HIT = 0.12;
+export function foesFor(round) {
+  const n = Math.min(round, MAX_FOES);
+  const last = Math.min(round - 1, ENEMIES.length - 1);
+  return Array.from({ length: n }, (_, k) => {
+    const e = ENEMIES[Math.max(0, last - (n - 1 - k))];
+    return { e, hp: Math.round(e.hp * (1 + ROUND_HP * (round - 1))), hit: Math.round(e.hit * (1 + ROUND_HIT * (round - 1))) };
+  });
+}
 // A pet's health and attack grow with its hearts and evolving. Hungry pets (empty belly) hit softer.
 export const petHp = p => 40 + 3 * p.hearts + (p.evolved ? 25 : 0);
 export const petHit = p => 10 + 1.5 * p.hearts + (p.evolved ? 8 : 0);
 export const HUNGRY_HIT = 0.75;
-// Healing after battles: a pet heals from tired (no health) to full in HEAL_HOURS, but only while
-// it has food in its belly. Each feeding also heals FEED_HEAL of its health right away.
-// A pet needs at least READY_HP of its health to fight.
-export const HEAL_HOURS = 2;
-export const FEED_HEAL = 0.25;
-export const READY_HP = 0.25;
+// Healing after battles: each word she finds heals HEAL_WORD of a pet's health.
+// All her pets must be fully healed before the next battle.
+export const HEAL_WORD = 0.25;
+// Monsters strike back after every COUNTER_EVERY of her attacks, even when she reads them all right.
+export const COUNTER_EVERY = 2;
 // Three right in a row (first try) is a super attack: double damage.
 export const COMBO = 3;
 // Grown-up setting: how long she has per word (multiplies each monster's time). 0 = no timer.
 export const BATTLE_SPEEDS = { off: 0, slow: 1.6, normal: 1, fast: 0.7 };
-// A win: stars, and pets that fought get hungrier.
+// A win: stars and the next egg. Pets that fought get hungrier.
 export const WIN_STARS = 3;

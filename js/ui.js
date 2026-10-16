@@ -3,6 +3,7 @@ import { CROPS } from './crops.js';
 import { farm, pets, settings, markWord, progress } from './state.js';
 import { pickWord, pickDistractors } from './practice.js';
 import { LINES } from './lines.js';
+import { noteFound, learnProgress, currentRound, quest } from './quest.js';
 import { sfx, say, preloadVoice } from './fx.js';
 
 const $ = id => document.getElementById(id);
@@ -14,6 +15,11 @@ export function renderHud() {
   $('starCount').textContent = progress.stars;
   $('eggCount').textContent = pets.eggs;
   $('eggs').hidden = !pets.eggs;
+  // Round progress: words found toward the battle, then ⚔️ when it's unlocked.
+  const { done, total } = learnProgress();
+  $('qRound').textContent = currentRound();
+  $('qFill').style.width = `${quest.ready ? 100 : total ? (done / total) * 100 : 0}%`;
+  $('quest').classList.toggle('ready', quest.ready);
 }
 
 export function bump(id) {
@@ -71,6 +77,8 @@ function choose(b) {
   }
   const missed = current.misses;
   markWord(target, missed === 0);
+  noteFound(target);
+  renderHud();
   sfx.good();
   const r = b.getBoundingClientRect();
   closeChoice();

@@ -1,12 +1,14 @@
 import * as THREE from 'three';
-import { MODULES, NUMBER_RANGES, buildPool, buildNumberPool } from './words.js';
-import { settings, saveSettings, stats, progress, pets as petState, battle as battleState, ready, startOver, restoreBackup, backupInfo, BACKUP_DAYS } from './state.js';
+import { NUMBER_RANGES } from './words.js';
+import { settings, saveSettings, stats, progress, pets as petState, battle as battleState, startOver, restoreBackup, backupInfo, BACKUP_DAYS } from './state.js';
+import { roundPool, carePool, learnProgress, LEARN_TIMES, onBattleReady, battleGate, currentRound, maxRound, setRound, quest } from './quest.js';
+import { renderHud } from './ui.js';
 import { updateParticles, hush, loadVoice, sfx, say } from './fx.js';
 import { LINES } from './lines.js';
 import { createFarm } from './farm.js';
 import { createPets } from './pets.js';
 import { createBattle } from './battle.js';
-import { BATTLE_SPEEDS, ENEMIES } from './creatures.js';
+import { BATTLE_SPEEDS, foesFor } from './creatures.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('c');
@@ -19,11 +21,21 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 
 const isNumbers = () => settings.mode === 'numbers';
-const currentPool = () => (isNumbers() ? buildNumberPool(settings.numberRanges) : buildPool(settings.modules, settings));
+const currentPool = roundPool; // the round's module (quest.js)
 
-const farm = createFarm({ getPool: currentPool, onSettings: openSettings, onEgg: () => { updateModeButton(); $('btnMode').classList.add('bump'); } });
-const pets = createPets({ getPool: currentPool, onSettings: openSettings, onChange: () => updateModeButton() });
-const battle = createBattle({ getPool: currentPool, onSettings: openSettings, onEnd: () => switchMode(pets) });
+const farm = createFarm({ getPool: roundPool, onSettings: openSettings });
+const pets = createPets({ getPool: roundPool, getCarePool: carePool, onSettings: openSettings, onChange: () => updateModeButton() });
+const battle = createBattle({ getPool: roundPool, onSettings: openSettings, onEnd: () => switchMode(pets) });
+
+// Every word in the round found twice: the battle is unlocked.
+onBattleReady(() => {
+  sfx.fanfare();
+  say([LINES.battleReady], { interrupt: false });
+  updateModeButton();
+  $('quest').classList.remove('bump');
+  void $('quest').offsetWidth;
+  $('quest').classList.add('bump');
+});
 if (location.search.includes('debug')) window.game = { farm, pets, battle }; // for automated tests
 
 // ---------- Farm <-> pets -> battle ----------
@@ -37,8 +49,11 @@ function updateModeButton() {
   b.querySelector('.e').textContent = toPets ? '🐾' : '🌱';
   b.querySelector('.t').textContent = toPets ? 'Pets' : 'Farm';
   b.setAttribute('aria-label', toPets ? 'Go to the pets' : 'Go to the farm');
-  $('modeDot').hidden = !(mode === farm && petState.eggs > 0);
+  const gate = battleGate();
+  $('modeDot').hidden = !(mode === farm && (petState.eggs > 0 || gate === 'go' || gate === 'heal'));
   $('btnBattle').hidden = !(mode === pets && petState.owned.length);
+  $('btnBattle').classList.toggle('locked', gate !== 'go');
+  $('btnBattle').classList.toggle('go', gate === 'go');
   $('hud').classList.toggle('battle', mode === battle);
 }
 function switchMode(to = mode === pets ? farm : pets) {
@@ -51,10 +66,13 @@ function switchMode(to = mode === pets ? farm : pets) {
   updateModeButton();
 }
 $('btnMode').onclick = () => switchMode();
+// The battle needs: the round's egg hatched, the round's words read, and every pet healed.
 $('btnBattle').onclick = () => {
-  if (petState.owned.some(ready)) return switchMode(battle);
+  const gate = battleGate();
+  if (gate === 'go') return switchMode(battle);
   sfx.oops();
-  say([LINES.allTired]);
+  say([{ egg: LINES.eggWelcome, learn: LINES.needLearn, heal: LINES.healPets }[gate] ?? LINES.petsWelcome]);
+  if (gate === 'learn') { $('quest').classList.remove('bump'); void $('quest').offsetWidth; $('quest').classList.add('bump'); }
 };
 
 // ---------- Grown-up settings ----------
@@ -71,23 +89,16 @@ function closeSettings() {
 }
 
 function renderSettings() {
-  const chips = $('moduleChips');
-  chips.innerHTML = '';
   const numbers = isNumbers();
-  const key = numbers ? 'numberRanges' : 'modules';
-  const options = numbers ? NUMBER_RANGES.map(r => ({ id: r.id, label: `${r.from}–${r.to}` })) : MODULES.map((_, i) => ({ id: i + 1, label: i + 1 }));
-  for (const { id, label } of options) {
-    const b = document.createElement('button');
-    b.className = 'chip';
-    b.textContent = label;
-    b.setAttribute('aria-pressed', settings[key].includes(id));
-    b.onclick = () => {
-      settings[key] = settings[key].includes(id) ? settings[key].filter(m => m !== id) : [...settings[key], id].sort((a, b) => a - b);
-      update();
-    };
-    chips.appendChild(b);
-  }
-  $('rangeTitle').textContent = numbers ? 'Numbers' : 'Modules';
+  // The round: which module (or numbers group) she's on, and how far toward the battle.
+  const r = currentRound();
+  const group = numbers ? `Numbers ${NUMBER_RANGES[r - 1].from}–${NUMBER_RANGES[r - 1].to}` : `Module ${r}`;
+  $('roundLabel').textContent = `Round ${r} · ${group}${quest.lap ? ` ★${quest.lap}` : ''}`;
+  $('roundDown').disabled = r <= 1;
+  $('roundUp').disabled = r >= maxRound();
+  const { done, total } = learnProgress();
+  const step = quest.ready ? 'Battle unlocked.' : `Found ${done} of ${total} toward the battle (each word ${LEARN_TIMES} times).`;
+  $('roundInfo').textContent = `${roundPool().join(', ')}. ${step}${quest.review ? ' Healing and feeding review every module so far.' : ''} Changing rounds starts the round over.`;
   $('mWords').setAttribute('aria-pressed', !numbers);
   $('mNumbers').setAttribute('aria-pressed', numbers);
   $('tIrregular').hidden = numbers;
@@ -106,8 +117,8 @@ function renderSettings() {
     speedChips.appendChild(b);
   }
   const secs = BATTLE_SPEEDS[settings.battleSpeed];
-  const lap = Math.floor(battleState.stage / ENEMIES.length);
-  $('battleInfo').textContent = `${secs ? `${Math.round(ENEMIES.at(-1).time * secs)}–${Math.round(ENEMIES[0].time * secs)} seconds per word. ` : 'No time limit. '}Battles won: ${battleState.wins}. Next: ${ENEMIES[battleState.stage % ENEMIES.length].name.replace(/^the /, '')}${lap ? ` (round ${lap + 1})` : ''}.`;
+  const foes = foesFor(r + quest.lap * 3);
+  $('battleInfo').textContent = `${secs ? `${Math.round(Math.min(...foes.map(f => f.e.time)) * secs)}–${Math.round(Math.max(...foes.map(f => f.e.time)) * secs)} seconds per word. ` : 'No time limit. '}Battles won: ${battleState.wins}. This round: ${foes.map(f => f.e.name.replace(/^the /, '')).join(', ')}.`;
 
   const choiceChips = $('choiceChips');
   choiceChips.innerHTML = '';
@@ -121,9 +132,7 @@ function renderSettings() {
   }
 
   const pool = currentPool();
-  $('poolInfo').textContent = pool.length
-    ? `${pool.length} ${numbers ? 'numbers' : 'words'} to practice`
-    : numbers ? 'Pick at least one group of numbers' : 'Pick at least one module and word type';
+  $('poolInfo').textContent = pool.length ? '' : 'Pick at least one word type';
   $('btnSettingsDone').disabled = !pool.length;
   $('totalStars').textContent = progress.stars;
 
@@ -171,14 +180,11 @@ function update() {
 
 $('btnSettings').onclick = openSettings;
 $('btnSettingsDone').onclick = closeSettings;
-$('selAll').onclick = () => {
-  if (isNumbers()) settings.numberRanges = NUMBER_RANGES.map(r => r.id);
-  else settings.modules = MODULES.map((_, i) => i + 1);
-  update();
-};
-$('selNone').onclick = () => { settings[isNumbers() ? 'numberRanges' : 'modules'] = []; update(); };
-$('mWords').onclick = () => { settings.mode = 'words'; update(); };
-$('mNumbers').onclick = () => { settings.mode = 'numbers'; update(); };
+$('roundDown').onclick = () => { setRound(currentRound() - 1); afterRoundChange(); };
+$('roundUp').onclick = () => { setRound(currentRound() + 1); afterRoundChange(); };
+function afterRoundChange() { update(); renderHud(); updateModeButton(); }
+$('mWords').onclick = () => { settings.mode = 'words'; afterRoundChange(); };
+$('mNumbers').onclick = () => { settings.mode = 'numbers'; afterRoundChange(); };
 $('tIrregular').onclick = () => { settings.irregular = !settings.irregular; update(); };
 $('tDecodable').onclick = () => { settings.decodable = !settings.decodable; update(); };
 

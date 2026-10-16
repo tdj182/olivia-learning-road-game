@@ -35,6 +35,7 @@
     </div>
     <div class="corner-right hud-stack">
       <div id="stars" class="pill-count"><span>⭐</span><span id="starCount">0</span></div>
+      <div id="quest" class="pill-count quest" title="Words read this round"><span>📖</span><span id="qRound">1</span><span class="qbar"><i id="qFill"></i></span><span class="qgo">⚔️</span></div>
       <div id="basket" class="pill-count basket"></div>
       <div id="eggs" class="pill-count" hidden><span>🥚</span><span id="eggCount">0</span></div>
     </div>
@@ -52,6 +53,7 @@
         <div class="fname" id="bFoeName"></div>
         <div class="hp"><i id="bFoeHp"></i><b id="bFoeNum"></b></div>
         <div id="bTimerWrap" class="timer" title="Time"><i id="bTimer"></i></div>
+        <div id="bFoes" class="team"></div>
       </div>
       <p id="bLoading" class="b-loading" hidden>Here it comes…</p>
     </div>
@@ -73,7 +75,6 @@
       <h2 id="beTitle">You won!</h2>
       <p id="beText"></p>
       <div class="end-buttons">
-        <button id="beAgain" class="big">Next ⚔️</button>
         <button id="beBack" class="big alt">🐾 Pets</button>
       </div>
     </div>
@@ -93,9 +94,13 @@
       </section>
 
       <section>
-        <h3 id="rangeTitle">Modules</h3>
-        <div id="moduleChips" class="chips"></div>
-        <div class="row-links"><button id="selAll" class="link">All</button><button id="selNone" class="link">None</button></div>
+        <h3>Round</h3>
+        <div class="round-row">
+          <button id="roundDown" class="chip" aria-label="Earlier round">◀</button>
+          <b id="roundLabel">Round 1</b>
+          <button id="roundUp" class="chip" aria-label="Later round">▶</button>
+        </div>
+        <p id="roundInfo" class="hint"></p>
         <div class="chips type-row">
           <button class="chip" id="tIrregular" aria-pressed="true">❤️ Irregular</button>
           <button class="chip" id="tDecodable" aria-pressed="true">🔤 Decodable</button>

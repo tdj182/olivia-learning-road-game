@@ -1,5 +1,5 @@
 // Settings, word stats, stars, the farm and the pets, saved in the browser.
-import { CREATURES, BELLY_MAX, BELLY_HOURS, EGG_EVERY, HEAL_HOURS, READY_HP, petHp } from './creatures.js';
+import { BELLY_MAX, BELLY_HOURS, petHp } from './creatures.js';
 
 export const store = {
   get(key, fallback) {
@@ -13,7 +13,7 @@ export const store = {
 // ---------- Start over (with a backup) ----------
 // Starting over clears her progress but keeps a copy for BACKUP_DAYS, in case it was an accident.
 // Settings (word lists, timer) are kept.
-const PROGRESS_KEYS = ['owr-farm', 'owr-pets', 'owr-battle', 'owr-stars', 'owr-stats'];
+const PROGRESS_KEYS = ['owr-farm', 'owr-pets', 'owr-battle', 'owr-quest', 'owr-stars', 'owr-stats'];
 export const BACKUP_DAYS = 3;
 const backupOld = b => Date.now() - b.at > BACKUP_DAYS * 86400e3;
 {
@@ -45,7 +45,7 @@ export function restoreBackup() {
 
 const saved = store.get('owr-settings', {});
 export const settings = {
-  mode: 'words', modules: [1, 2, 3, 4, 5, 6, 7, 8, 9], numberRanges: [1, 2], irregular: true, decodable: true,
+  mode: 'words', irregular: true, decodable: true, // which words: the round picks the module (quest.js)
   choices: 3,  // words to pick from each time: 3, 4 or 5
   battleSpeed: 'normal', // time per word in battles: off, slow, normal, fast (creatures.js BATTLE_SPEEDS)
 };
@@ -71,9 +71,9 @@ export const farm = Object.assign({ plots: [], basket: {} }, store.get('owr-farm
 while (farm.plots.length < PLOTS) farm.plots.push({ crop: null, word: null, stage: 0 });
 export const saveFarm = () => store.set('owr-farm', farm);
 
-// eggs: waiting in the nest (the first one is free). cracks: progress on the next egg.
-// picked: crops picked toward the next egg. owned: { id, hearts, evolved, belly, at, hurt, hurtAt } per pet.
-export const pets = Object.assign({ eggs: 1, cracks: 0, picked: 0, owned: [] }, store.get('owr-pets', {}));
+// eggs: waiting in the nest (the first one is free, then one per battle won). cracks: progress on
+// the next egg. owned: { id, hearts, evolved, belly, at, hurt } per pet.
+export const pets = Object.assign({ eggs: 1, cracks: 0, owned: [] }, store.get('owr-pets', {}));
 export const savePets = () => store.set('owr-pets', pets);
 
 // Belly right now: one empties every BELLY_HOURS since it was last filled.
@@ -82,45 +82,17 @@ export function belly(p) {
   return Math.max(0, Math.min(BELLY_MAX, p.belly - gone));
 }
 export function setBelly(p, n) {
-  settle(p); // healing so far used the old belly
   p.belly = n;
   p.at = Date.now();
 }
 
-// Health: hurt is the damage left from battles at hurtAt. It heals while the belly has food
-// (the belly is empty from at + belly * BELLY_HOURS on).
-const HOUR = 3600e3;
-export function hurt(p) {
-  if (!p.hurt) return 0;
-  const fedMs = Math.max(0, Math.min(Date.now(), p.at + p.belly * BELLY_HOURS * HOUR) - p.hurtAt);
-  return Math.max(0, p.hurt - petHp(p) * fedMs / (HEAL_HOURS * HOUR));
-}
-function settle(p) {
-  p.hurt = Math.round(hurt(p) * 10) / 10;
-  p.hurtAt = Date.now();
-}
-export const health = p => Math.max(0, Math.floor(petHp(p) - hurt(p)));
-export const ready = p => health(p) >= petHp(p) * READY_HP;
+// Health: hurt is the damage left from battles. Only studying heals it (pets.js).
+export const health = p => Math.max(0, Math.round(petHp(p) - (p.hurt ?? 0)));
 export function setHealth(p, hp) {
-  settle(p);
-  p.hurt = Math.max(0, petHp(p) - hp);
+  p.hurt = Math.max(0, Math.round(petHp(p) - hp));
 }
 
-// stage: place on the monster ladder (the monster is ENEMIES[stage % ENEMIES.length], and every
-// lap of the ladder is a tougher round). A loss goes back to the first monster of the round.
 // wins: battles won ever.
-export const battle = Object.assign({ stage: 0 }, store.get('owr-battle', {}));
-battle.wins ??= battle.stage;
+export const battle = Object.assign({ wins: 0 }, store.get('owr-battle', {}));
+if ('stage' in battle) { battle.wins = Math.max(battle.wins ?? 0, battle.stage); delete battle.stage; }
 export const saveBattle = () => store.set('owr-battle', battle);
-
-const eggsLeft = () => CREATURES.length - pets.owned.length - pets.eggs;
-
-// Counts a picked crop; true if she found an egg with it.
-export function pickedCrop() {
-  if (eggsLeft() <= 0) return false;
-  pets.picked++;
-  const found = pets.picked >= EGG_EVERY;
-  if (found) { pets.picked = 0; pets.eggs++; }
-  savePets();
-  return found;
-}

@@ -1,8 +1,7 @@
 import * as THREE from 'three';
-import {
-  creatureById, ENEMIES, LAP_POWER, TEAM, petHp, petHit, HUNGRY_HIT, COMBO, BATTLE_SPEEDS, WIN_STARS,
-} from './creatures.js';
-import { pets, savePets, belly, setBelly, health, ready, setHealth, battle, saveBattle, settings, progress } from './state.js';
+import { creatureById, foesFor, petHp, petHit, HUNGRY_HIT, COMBO, COUNTER_EVERY, BATTLE_SPEEDS, WIN_STARS } from './creatures.js';
+import { pets, savePets, belly, setBelly, health, setHealth, battle, saveBattle, settings, progress } from './state.js';
+import { battleRound, wonRound, lostRound } from './quest.js';
 import { LINES } from './lines.js';
 import { loadModel, normalize, burst, sfx, say, floatText, toScreen, CONFETTI } from './fx.js';
 import { ask, choosing, closeChoice, renderHud, sayTarget } from './ui.js';
@@ -18,9 +17,9 @@ const NATURE = [['MapleTree_1', 6.5], ['BirchTree_2', 7], ['MapleTree_3', 7.5], 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const rand = (a, b) => a + Math.random() * (b - a);
 
-// Battles: her strongest pets, one at a time, against a wild monster. Each word she finds
-// is an attack. A wrong tap, or running out of time, lets the monster attack. Pets that
-// run out of health are tired (not hurt for good); when all of them are, the monster wins.
+// Battles: all her pets, one at a time (strongest first), against the round's monsters, one after
+// another. Each word she finds is an attack. A wrong tap, or running out of time, lets the monster
+// attack. Pets that run out of health are tired (studying heals them); when all are, the monsters win.
 export function createBattle({ getPool, onSettings, onEnd }) {
   const $ = id => document.getElementById(id);
 
@@ -77,7 +76,8 @@ export function createBattle({ getPool, onSettings, onEnd }) {
   // ---------- Fight state ----------
   let team = [];     // { data, c, hp, max }
   let mine = null;   // the pet fighting now: a team entry + its 3D creature (f)
-  let foe = null;    // { e, hp, max, hit, f }
+  let foe = null;    // { e, hp, max, hit, f }: the monster fighting now
+  let foes = [];     // the round's monsters, in order
   let phase = 'off'; // off | intro | fight | over
   let clock = 0;     // seconds into the current word
   let locked = 0;    // seconds the timer is paused (an attack is flying)
@@ -85,12 +85,6 @@ export function createBattle({ getPool, onSettings, onEnd }) {
   let foeBusy = false; // the monster is mid-attack
   let run = 0;       // bumps on every new battle, so old timeouts stop
 
-  const enemyFor = stage => {
-    const e = ENEMIES[stage % ENEMIES.length];
-    const lap = Math.floor(stage / ENEMIES.length);
-    const k = LAP_POWER ** lap;
-    return { e, hp: Math.round(e.hp * k), hit: Math.round(e.hit * k), lap };
-  };
   const limit = () => (foe ? foe.e.time * BATTLE_SPEEDS[settings.battleSpeed] : 0);
   const power = p => health(p) + petHit(p) * 3;
 
@@ -114,33 +108,36 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     foeBusy = false;
     combo = 0;
     clear();
-    // The strongest pets that are rested enough to fight, with the health they have now.
-    team = pets.owned.filter(ready).sort((a, b) => power(b) - power(a)).slice(0, TEAM)
+    // All her pets (main.js only starts a battle when they're all healed), strongest first.
+    team = [...pets.owned].sort((a, b) => power(b) - power(a))
       .map(data => ({ data, c: creatureById(data.id), hp: health(data), max: petHp(data) }));
-    if (!team.length) { say([LINES.allTired]); phase = 'off'; return onEnd(); }
+    foes = foesFor(battleRound()).map(x => ({ ...x, max: x.hp }));
     saved = false;
-    const { e, hp, hit } = enemyFor(battle.stage);
     $('battleBars').hidden = false;
-    $('bFoeName').textContent = e.boss ? `👑 ${e.name.replace(/^the /, '')}` : e.name;
     $('bLoading').hidden = false;
-    const s = spots();
-    const [ff] = await Promise.all([
-      spawn(`assets/models/enemies/${e.model}.glb`, e.boss ? BOSS_H : FOE_H, s.foe, e.fly),
-      sendIn(team[0], false),
-    ]);
-    if (my !== run) { scene.remove(ff.root); return; }
+    await Promise.all([sendIn(team[0], false), bringFoe(foes[0], my)]);
+    if (my !== run) return;
     $('bLoading').hidden = true;
-    foe = { e, hp, max: hp, hit, f: ff };
-    faceEachOther();
-    renderBars();
-    animate(0.7, k => { ff.root.scale.setScalar(0.2 + 0.8 * elastic(k)); });
-    play(ff, 'jump');
-    if (e.boss) sfx.fanfare();
-    say([e.appears, mine.c.go]);
+    say([foe.e.appears, mine.c.go]);
     await sleep(2600);
     if (my !== run) return;
     phase = 'fight';
     round();
+  }
+
+  // The next monster comes in.
+  async function bringFoe(next, my) {
+    const f = await spawn(`assets/models/enemies/${next.e.model}.glb`, next.e.boss ? BOSS_H : FOE_H, spots().foe, next.e.fly);
+    if (my !== run) { scene.remove(f.root); return; }
+    if (foe?.f) scene.remove(foe.f.root);
+    foe = next;
+    foe.f = f;
+    $('bFoeName').textContent = next.e.boss ? `👑 ${next.e.name.replace(/^the /, '')}` : next.e.name;
+    faceEachOther();
+    renderBars();
+    animate(0.7, k => f.root.scale.setScalar(0.2 + 0.8 * elastic(k)));
+    play(f, 'jump');
+    if (next.e.boss) sfx.fanfare();
   }
 
   async function sendIn(member, announce = true) {
@@ -211,24 +208,29 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     const s = toScreen(at, camera);
     floatText(big ? `💥 ${dmg}` : `-${dmg}`, s.x, s.y - 30, 'good');
     renderBars();
-    if (foe.hp <= 0) return win();
+    if (foe.hp <= 0) return foeDown();
     play(foe.f, 'hit');
     await sleep(500);
+    if (my !== run) return;
+    // Every few hits, the monster strikes back (if her pet gets tired, that starts the next round).
+    foe.strikes = (foe.strikes ?? 0) + 1;
+    if (foe.strikes % COUNTER_EVERY === 0) await foeAttack(false, true);
     if (my !== run || me.hp <= 0 || mine !== me) return;
     locked = 0;
     round();
   }
 
-  async function foeAttack(slow) {
+  // slow: her time ran out. counter: striking back (doesn't break her combo).
+  async function foeAttack(slow, counter = false) {
     if (phase !== 'fight' || !mine?.f || foeBusy) return;
     const my = run;
     foeBusy = true;
-    try { await foeTurn(slow, my); } finally { if (my === run) foeBusy = false; }
+    try { await foeTurn(slow, counter, my); } finally { if (my === run) foeBusy = false; }
   }
 
-  async function foeTurn(slow, my) {
+  async function foeTurn(slow, counter, my) {
     locked = 99;
-    combo = 0;
+    if (!counter) combo = 0;
     if (slow) say([LINES.tooSlow]);
     play(foe.f, 'attack');
     await sleep(300);
@@ -276,22 +278,40 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     savePets();
   }
 
+  // A monster is beaten: the next one comes in, or she won.
+  async function foeDown() {
+    const my = run;
+    foe.f.dead = true;
+    play(foe.f, 'die');
+    play(mine.f, 'happy');
+    burst(foe.f.root.position.clone().add(new THREE.Vector3(0, 1.5, 0)), 60, CONFETTI, scene, 1);
+    const next = foes[foes.indexOf(foe) + 1];
+    if (!next) return win();
+    sfx.good();
+    await sleep(1600);
+    if (my !== run) return;
+    await bringFoe(next, my);
+    if (my !== run) return;
+    say([next.e.appears]);
+    await sleep(1800);
+    if (my !== run) return;
+    locked = 0;
+    round();
+  }
+
+  let gotEgg = false;
   async function win() {
     phase = 'over';
     const my = run;
     closeChoice();
-    foe.f.dead = true;
-    play(foe.f, 'die');
-    play(mine.f, 'happy');
     sfx.fanfare();
-    burst(foe.f.root.position.clone().add(new THREE.Vector3(0, 1.5, 0)), 90, CONFETTI, scene, 1.2);
     for (let i = 0; i < WIN_STARS; i++) progress.addStar();
-    battle.stage++;
     battle.wins++;
     saveBattle();
     afterBattle();
+    gotEgg = wonRound();
     renderHud();
-    say([LINES.won]);
+    say([gotEgg ? LINES.wonEgg : LINES.won]);
     await sleep(1800);
     if (my !== run) return;
     showEnd(true);
@@ -303,9 +323,7 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     closeChoice();
     play(foe.f, 'happy');
     afterBattle();
-    // Back to the first monster of this round.
-    battle.stage -= battle.stage % ENEMIES.length;
-    saveBattle();
+    lostRound();
     say([LINES.lost]);
     await sleep(1500);
     if (my !== run) return;
@@ -316,13 +334,8 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     $('battleEnd').hidden = false;
     $('beEmoji').textContent = won ? '🏆' : '😴';
     $('beTitle').textContent = won ? 'You won!' : 'The monster won!';
-    $('beText').textContent = won ? `+${WIN_STARS} ⭐` : 'Feed your pets and try again!';
-    const next = enemyFor(battle.stage);
-    $('beAgain').textContent = `${won ? 'Next' : 'Start again'}: ${next.e.boss ? '👑 ' : ''}${next.e.name.replace(/^the /, '')} ⚔️`;
-    $('beAgain').hidden = !pets.owned.some(ready);
-    if (!won && $('beAgain').hidden) $('beText').textContent = 'Your pets need food and rest!';
+    $('beText').textContent = won ? `+${WIN_STARS} ⭐${gotEgg ? '  +1 🥚' : ''}` : 'Heal your pets and try again!';
   }
-  $('beAgain').onclick = () => { $('battleEnd').hidden = true; sfx.pop(); start(); };
   $('beBack').onclick = () => { $('battleEnd').hidden = true; onEnd(); };
 
   // ---------- HUD ----------
@@ -335,6 +348,7 @@ export function createBattle({ getPool, onSettings, onEnd }) {
       $('bPetName').textContent = mine.c.name;
       $('bPetHp').style.width = `${(mine.hp / mine.max) * 100}%`;
       $('bPetNum').textContent = mine.hp;
+      $('bFoes').innerHTML = foes.length > 1 ? foes.map(x => `<span class="${x === foe ? 'now' : x.hp > 0 ? '' : 'out'}" style="background:${x.e.color}">${x.e.name.replace(/^the /, '')[0]}</span>`).join('') : '';
       $('bTeam').innerHTML = team.map(m => `<span class="${m === mine ? 'now' : m.hp > 0 ? '' : 'out'}" style="background:${m.c.color}">${m.c.name[0]}</span>`).join('');
       $('bHungry').hidden = belly(mine.data) > 0;
     }
@@ -349,6 +363,7 @@ export function createBattle({ getPool, onSettings, onEnd }) {
   function clear() {
     for (const x of [mine?.f, foe?.f, ...team.map(m => m.f)]) if (x) scene.remove(x.root);
     mine = foe = null;
+    foes = [];
     anims.length = 0;
   }
 

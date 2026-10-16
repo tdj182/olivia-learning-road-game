@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CROPS, cropById, RIPE } from './crops.js';
-import { farm, saveFarm, settings, progress, pickedCrop } from './state.js';
+import { farm, saveFarm, settings, progress } from './state.js';
 import { LINES, PRAISE } from './lines.js';
 import { loadModel, normalize, burst, sfx, say, flyEmoji, floatText, toScreen } from './fx.js';
 import { ask, choosing, closeChoice, renderHud, bump } from './ui.js';
@@ -16,7 +16,7 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 
 // The farm: garden patches with a word sign each. Planting, watering and picking each
 // mean finding a new random word she hears among a few choices; the sign shows the last one found.
-export function createFarm({ getPool, onSettings, onEgg }) {
+export function createFarm({ getPool, onSettings }) {
 
   // ---------- Scene ----------
   const SKY = new THREE.Color('#9fd8ff');
@@ -332,14 +332,6 @@ export function createFarm({ getPool, onSettings, onEgg }) {
     sfx.good();
     const s = toScreen(at.clone().add(new THREE.Vector3(0, 2, 0)), camera);
     floatText('+1 ⭐', s.x, s.y, 'good');
-    if (pickedCrop()) {
-      // An egg! It flies to the pets button.
-      setTimeout(() => {
-        const r = document.getElementById('btnMode').getBoundingClientRect();
-        flyEmoji('🥚', s, { x: r.left + r.width / 2, y: r.top + r.height / 2 }, () => { sfx.chirp(); renderHud(); onEgg(); });
-        say([LINES.foundEgg], { interrupt: false });
-      }, 1100);
-    }
     if (progress.stars % 5 === 0) {
       say([crop.picked, settings.mode === 'numbers' ? LINES.cheerNumbers : LINES.cheerWords]);
       setTimeout(sfx.fanfare, 300);
