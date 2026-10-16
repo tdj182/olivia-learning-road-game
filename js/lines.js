@@ -2,6 +2,7 @@
 // line, word and number here, so keep spoken text in this file.
 import { ALL_WORDS } from './words.js';
 import { CROPS } from './crops.js';
+import { CREATURES } from './creatures.js';
 
 export const LINES = {
   welcome: 'Welcome to your farm, Olivia! Tap a garden patch to plant a seed.',
@@ -16,6 +17,13 @@ export const LINES = {
   plantMore: 'Plant another seed!',
   cheerWords: 'Great reading, Olivia!',
   cheerNumbers: 'Great counting, Olivia!',
+  foundEgg: 'You found an egg! Take it to your pets.',
+  petsWelcome: 'These are your pets! Tap a pet to feed it.',
+  eggWelcome: 'Tap the egg to hatch it!',
+  crackWhich: 'Find the egg that says',
+  feedWhich: 'Find the food that says',
+  noFood: 'Your pets are hungry! Go pick food on the farm.',
+  full: "I'm full! Thank you!",
 };
 export const PRAISE = ['Great job!', 'You got it!', 'Awesome!', 'Super reading!', 'Yes!', 'Way to go!', 'Wonderful!'];
 
@@ -29,6 +37,7 @@ export function allLines() {
     ...Array.from({ length: 100 }, (_, i) => ({ text: String(i + 1), slow: true })),
     ...[...Object.values(LINES), ...PRAISE].map(text => ({ text })),
     ...CROPS.map(c => ({ text: c.picked })),
+    ...CREATURES.flatMap(c => [{ text: `${c.name}!` }, { text: c.hatched }, { text: c.evolved }]),
   ];
   const seen = new Set();
   return lines.filter(l => { const k = voiceKey(l.text); if (seen.has(k)) return false; seen.add(k); return true; });

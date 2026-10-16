@@ -57,6 +57,20 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; }
 .corner-left { position: absolute; top: max(14px, env(safe-area-inset-top)); left: 14px; }
 .corner-right { position: absolute; top: max(14px, env(safe-area-inset-top)); right: 14px; }
 .hud-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.hud-row { display: flex; align-items: center; gap: 12px; }
+.mode-btn {
+  position: relative; display: flex; align-items: center; gap: 6px; height: 64px; padding: 0 22px 0 14px;
+  border-radius: 32px; background: var(--pink); color: #fff; font-size: 28px; font-weight: 800;
+  box-shadow: 0 6px 0 #c9457c, 0 12px 24px rgba(0,0,0,0.15);
+}
+.mode-btn.to-farm { background: var(--green); box-shadow: 0 6px 0 #23864e, 0 12px 24px rgba(0,0,0,0.15); }
+.mode-btn .e { font-size: 34px; }
+.mode-btn:active { transform: translateY(3px); }
+.mode-btn i {
+  position: absolute; top: -4px; right: -4px; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--yellow); border: 3px solid #fff; animation: pulse 1s ease-in-out infinite;
+}
+.mode-btn.bump { animation: bump 0.5s ease; }
 .pill-count {
   background: var(--card); border-radius: 28px; padding: 6px 16px; box-shadow: var(--shadow);
   font-size: 26px; font-weight: 800; display: flex; align-items: center; gap: 6px;
@@ -86,6 +100,8 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; }
 .packet .w { font-family: var(--font-read); font-weight: 700; font-size: 42px; line-height: 1.1; }
 .packet.drop { background: linear-gradient(#e3f4ff, #b9e3ff); border-color: #6cc0f5; box-shadow: 0 6px 0 #3f93cc, 0 10px 20px rgba(0,0,0,0.15); }
 .packet.basket-pick { background: linear-gradient(#fff1e0, #ffd9a8); border-color: #e0a15a; box-shadow: 0 6px 0 #b8783a, 0 10px 20px rgba(0,0,0,0.15); }
+.packet.egg { background: linear-gradient(#fffdf6, #f3ead6); border-color: #d9c49a; box-shadow: 0 6px 0 #b39c6c, 0 10px 20px rgba(0,0,0,0.15); }
+.packet.food { background: linear-gradient(#ffe8f1, #ffc7dc); border-color: #f08bb3; box-shadow: 0 6px 0 #c9457c, 0 10px 20px rgba(0,0,0,0.15); }
 .packet.wrong { opacity: 0.35; filter: grayscale(1); animation: shakeX 0.4s ease; pointer-events: none; }
 .packet.hint { animation: pulse 0.8s ease-in-out infinite; border-color: var(--green); }
 @keyframes pulse { 50% { transform: scale(1.08); } }
@@ -153,5 +169,6 @@ section { margin-top: 20px; }
   .packet { min-width: 96px; padding: 8px 12px 10px; }
   .packet .e { font-size: 32px; }
   .packet .w { font-size: 34px; }
-  .read-status { font-size: 20px; }
+  .mode-btn { height: 52px; font-size: 22px; padding: 0 16px 0 10px; }
+  .mode-btn .e { font-size: 26px; }
 }

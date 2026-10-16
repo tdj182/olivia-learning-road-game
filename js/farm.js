@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { CROPS, cropById, RIPE } from './crops.js';
-import { farm, saveFarm, settings, markWord, progress } from './state.js';
-import { pickWord, pickDistractors } from './practice.js';
+import { farm, saveFarm, settings, progress, pickedCrop } from './state.js';
 import { LINES, PRAISE } from './lines.js';
-import { loadModel, normalize, burst, sfx, say, preloadVoice, flyEmoji, floatText, toScreen } from './fx.js';
+import { loadModel, normalize, burst, sfx, say, flyEmoji, floatText, toScreen } from './fx.js';
+import { ask, choosing, closeChoice, renderHud, bump } from './ui.js';
 
 // ---------- Tuning ----------
 const PLOT = 2.3;             // garden patch size
@@ -16,12 +16,7 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 
 // The farm: garden patches with a word sign each. Planting, watering and picking each
 // mean finding a new random word she hears among a few choices; the sign shows the last one found.
-export function createFarm({ getPool, onSettings }) {
-  const $ = id => document.getElementById(id);
-  const el = {
-    root: $('farm'), basket: $('basket'), stars: $('starCount'),
-    seeds: $('seeds'), seedTitle: $('seedTitle'), seedRow: $('seedRow'),
-  };
+export function createFarm({ getPool, onSettings, onEgg }) {
 
   // ---------- Scene ----------
   const SKY = new THREE.Color('#9fd8ff');
@@ -252,17 +247,8 @@ export function createFarm({ getPool, onSettings }) {
 
   const plotScreen = i => toScreen(plots[i].group.position.clone().add(new THREE.Vector3(0, 1, 0)), camera);
 
-  function renderHud() {
-    const items = CROPS.filter(c => farm.basket[c.id]).map(c => `<span>${c.emoji}<b>${farm.basket[c.id]}</b></span>`).join('');
-    el.basket.innerHTML = `<span class="basket-icon">🧺</span>${items}`;
-    el.stars.textContent = progress.stars;
-  }
-
   // ---------- Hear it, find it: seeds to plant, water drops, baskets to pick ----------
-  // The game says a word and she taps the choice with that word on it.
-  // plant: an empty patch gets a new practice word. water / pick: the word on the patch's sign.
-  let busy = null; // null | 'choose'
-  let choice = null;
+  // plant: an empty patch gets a new practice word. water / pick: a new word goes on the patch's sign.
   const KINDS = {
     plant: { title: '🌱 Find the seed!', line: LINES.plantWhich, cls: 'seed' },
     water: { title: '💧 Find the water drop!', line: LINES.waterWhich, cls: 'drop' },
@@ -274,69 +260,33 @@ export function createFarm({ getPool, onSettings }) {
     if (!pool.length) return onSettings();
     const p = farm.plots[i];
     const kind = p.stage === 0 ? 'plant' : p.stage >= RIPE ? 'pick' : 'water';
-    // A new word every time, different from the ones already on the signs.
-    const onSigns = new Set(farm.plots.map(x => x.word).filter(Boolean));
-    const fresh = pool.filter(w => !onSigns.has(w));
-    const target = pickWord(fresh.length ? fresh : pool, p.word);
-    const words = shuffle([target, ...pickDistractors(pool, target, settings.choices - 1)]);
     const seedCrops = shuffle([...CROPS]);
-    choice = { plot: i, kind, target, misses: 0 };
-    el.seedTitle.textContent = KINDS[kind].title;
-    el.seedRow.innerHTML = '';
-    words.forEach((w, j) => {
-      const crop = kind === 'plant' ? seedCrops[j % seedCrops.length] : cropById(p.crop);
-      const icon = kind === 'plant' ? crop.emoji : kind === 'water' ? '💧' : '🧺';
-      const b = document.createElement('button');
-      b.className = `packet ${KINDS[kind].cls}`;
-      b.dataset.word = w;
-      b.dataset.crop = crop.id;
-      b.innerHTML = `<span class="e">${icon}</span><span class="w">${w}</span>`;
-      b.onclick = () => choose(b);
-      el.seedRow.appendChild(b);
+    const cropFor = j => (kind === 'plant' ? seedCrops[j % seedCrops.length] : cropById(p.crop));
+    ask({
+      ...KINDS[kind],
+      pool, avoid: p.word,
+      avoidAll: farm.plots.map(x => x.word).filter(Boolean), // a new word, not one already on a sign
+      icon: j => (kind === 'plant' ? cropFor(j).emoji : kind === 'water' ? '💧' : '🧺'),
+      data: j => ({ crop: cropFor(j).id }),
+      done: (b, from) => chose(i, kind, b.dataset.word, cropById(b.dataset.crop), from),
     });
-    busy = 'choose';
-    el.seeds.hidden = false;
-    preloadVoice(words);
-    say([KINDS[kind].line, target]);
   }
 
-  function choose(b) {
-    if (!choice) return;
-    const { target, plot, kind } = choice;
-    if (b.dataset.word !== target) {
-      choice.misses++;
-      sfx.oops();
-      b.classList.add('wrong');
-      say([LINES.oopsSays, b.dataset.word, LINES.letsFind, target, LINES.again]);
-      if (choice.misses >= 2) el.seedRow.querySelector(`[data-word="${CSS.escape(target)}"]`)?.classList.add('hint');
-      return;
-    }
-    markWord(target, choice.misses === 0);
-    sfx.good();
-    const r = b.getBoundingClientRect();
-    const from = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-    closeChoice();
+  function chose(plot, kind, word, crop, from) {
     if (kind !== 'plant') {
-      farm.plots[plot].word = target; // the sign shows the last word she found
+      farm.plots[plot].word = word; // the sign shows the last word she found
       if (kind === 'water') flyEmoji('💧', from, plotScreen(plot), () => grow(plot));
       else grow(plot);
       return;
     }
     say([pick(PRAISE)]);
-    const crop = cropById(b.dataset.crop);
     flyEmoji(crop.emoji, from, plotScreen(plot), () => {
-      Object.assign(farm.plots[plot], { crop: crop.id, word: target, stage: 1 });
+      Object.assign(farm.plots[plot], { crop: crop.id, word, stage: 1 });
       saveFarm();
       sfx.plop();
       burst(plots[plot].group.position.clone().add(new THREE.Vector3(0, 0.4, 0)), 18, ['#7d5230', '#9a6a3f', '#38c172'], scene, 0.5);
       showPlot(plot, true);
     });
-  }
-
-  function closeChoice() {
-    choice = null;
-    busy = null;
-    el.seeds.hidden = true;
   }
 
   // ---------- Growing and picking ----------
@@ -365,11 +315,9 @@ export function createFarm({ getPool, onSettings }) {
       item.rotation.y = k * 6;
       if (k >= 1) {
         scene.remove(item);
-        const r = el.basket.getBoundingClientRect();
+        const r = document.getElementById('basket').getBoundingClientRect();
         flyEmoji(crop.emoji, toScreen(item.position, camera), { x: r.left + 30, y: r.top + r.height / 2 }, () => {
-          el.basket.classList.remove('bump');
-          void el.basket.offsetWidth;
-          el.basket.classList.add('bump');
+          bump('basket');
           sfx.coin();
           renderHud();
         });
@@ -384,6 +332,14 @@ export function createFarm({ getPool, onSettings }) {
     sfx.good();
     const s = toScreen(at.clone().add(new THREE.Vector3(0, 2, 0)), camera);
     floatText('+1 ⭐', s.x, s.y, 'good');
+    if (pickedCrop()) {
+      // An egg! It flies to the pets button.
+      setTimeout(() => {
+        const r = document.getElementById('btnMode').getBoundingClientRect();
+        flyEmoji('🥚', s, { x: r.left + r.width / 2, y: r.top + r.height / 2 }, () => { sfx.chirp(); renderHud(); onEgg(); });
+        say([LINES.foundEgg], { interrupt: false });
+      }, 1100);
+    }
     if (progress.stars % 5 === 0) {
       say([crop.picked, settings.mode === 'numbers' ? LINES.cheerNumbers : LINES.cheerWords]);
       setTimeout(sfx.fanfare, 300);
@@ -393,7 +349,7 @@ export function createFarm({ getPool, onSettings }) {
   // ---------- Input ----------
   const raycaster = new THREE.Raycaster();
   function onPointer(e) {
-    if (busy) return;
+    if (choosing()) return;
     const ndc = new THREE.Vector2(e.clientX / window.innerWidth * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
     const hit = raycaster.intersectObjects(hitboxes)[0];
@@ -403,19 +359,12 @@ export function createFarm({ getPool, onSettings }) {
     openChoice(i);
   }
 
-  $('btnSeedClose').onclick = closeChoice;
-  $('btnSeedSay').onclick = () => choice && say([choice.target]);
-
   // ---------- Mode ----------
   function enter() {
-    el.root.hidden = false;
     renderHud();
     if (farm.plots.every(p => p.stage === 0)) say([LINES.welcome]);
   }
-  function exit() {
-    closeChoice();
-    el.root.hidden = true;
-  }
+  const exit = closeChoice;
 
   function resize(aspect) {
     const newCols = aspect < 0.8 ? 2 : 3;
@@ -443,7 +392,7 @@ export function createFarm({ getPool, onSettings }) {
     }
     plots.forEach((v, i) => {
       v.marker.position.y = (v.markerY ?? 1) + Math.sin(t * 2.6 + i) * 0.12;
-      v.marker.visible = !busy;
+      v.marker.visible = !choosing();
       if (farm.plots[i].stage >= RIPE) v.plant.rotation.z = Math.sin(t * 3 + i) * 0.035;
       else v.plant.rotation.z = 0;
     });

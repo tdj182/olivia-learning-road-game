@@ -10,7 +10,18 @@ Every patch in the garden has a word sign. Each step is **hear it, find it**: th
 - A wrong tap reads that word aloud ("Oops! That says *want*") and asks again; after two misses the right one pulses. Every choice set includes a look-alike word (went/want, this/his) when the list has one.
 - Words she misses come up more often. Stats, stars, the garden and the basket are saved in the browser.
 
-Crops: carrot, pumpkin, watermelon, corn, tomato, lettuce (`js/crops.js`). The basket is meant to feed pets later.
+Crops: carrot, pumpkin, watermelon, corn, tomato, lettuce (`js/crops.js`).
+
+## Pets
+
+The **🐾 Pets** button (top left) goes to the pet yard, and **🌱 Farm** goes back.
+
+- 🥚 **Eggs:** the first egg is free, and she finds another every 4 crops she picks (a dot on the 🐾 button means one is waiting). Tap the egg in the nest and find 3 words ("Find the egg that says…") to crack it open. Each egg hatches a pet she doesn't have yet. There are 10.
+- 🍽️ **Feeding:** tap a pet and find the word on the food ("Find the food that says…"). Food comes from the basket, so she has to keep farming. Each feeding earns a ❤️.
+- 🍎 **Hunger:** a pet's belly holds 3 meals and empties one every hour, so pets only eat (and earn hearts) when they're hungry. A full pet says "I'm full!" and dances. A 🍎 above a pet means it's empty.
+- ✨ **Evolving:** at 6 ❤️ a baby evolves into its big form.
+
+Pets and tuning (hearts to evolve, belly size and timing, eggs per crop, cracks per egg) are in `js/creatures.js`.
 
 ### Grown-up settings (⚙️, top left)
 
@@ -49,6 +60,9 @@ Plain HTML/JS with [three.js](https://threejs.org) copied into `vendor/`, so the
 
 - `js/farm.js`: the farm scene and the plant / water / pick game. Tuning at the top.
 - `js/crops.js`: crops and growth stages
+- `js/pets.js`: the pet yard: hatching, feeding, evolving
+- `js/creatures.js`: the pets and their tuning
+- `js/ui.js`: the HUD and the shared hear-it-find-it choice sheet
 - `js/practice.js`: picking practice words and look-alike choices
 - `js/words.js`: the word lists
 - `js/state.js`: saved settings and stats
@@ -57,7 +71,7 @@ Plain HTML/JS with [three.js](https://threejs.org) copied into `vendor/`, so the
 - `js/fx.js`: shared sounds, speech, particles
 - `tools/icon.html` draws the app icons.
 
-3D models are by [Quaternius](https://quaternius.com) (CC0). See `assets/models/LICENSE-Quaternius.txt`. The farm models (`assets/models/farm/*.glb`) were converted from the Nature Crops and Farm Buildings OBJ packs with Blender.
+3D models are by [Quaternius](https://quaternius.com) (CC0). See `assets/models/LICENSE-Quaternius.txt`. The farm models (`assets/models/farm/*.glb`) were converted from the Nature Crops and Farm Buildings OBJ packs with Blender. The pets (`assets/models/pets/*.glb`) are from Ultimate Monsters, converted with [glTF-Transform](https://gltf-transform.dev) (unused animations dropped, resampled, quantized).
 
 ### Parked: reading out loud
 

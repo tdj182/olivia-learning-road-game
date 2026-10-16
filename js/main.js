@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { MODULES, NUMBER_RANGES, buildPool, buildNumberPool } from './words.js';
-import { settings, saveSettings, stats, progress } from './state.js';
-import { updateParticles, hush, loadVoice } from './fx.js';
+import { settings, saveSettings, stats, progress, pets as petState } from './state.js';
+import { updateParticles, hush, loadVoice, sfx } from './fx.js';
 import { createFarm } from './farm.js';
+import { createPets } from './pets.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('c');
@@ -17,11 +18,36 @@ renderer.toneMappingExposure = 1.05;
 const isNumbers = () => settings.mode === 'numbers';
 const currentPool = () => (isNumbers() ? buildNumberPool(settings.numberRanges) : buildPool(settings.modules, settings));
 
-const farm = createFarm({ getPool: currentPool, onSettings: openSettings });
+const farm = createFarm({ getPool: currentPool, onSettings: openSettings, onEgg: () => { updateModeButton(); $('btnMode').classList.add('bump'); } });
+const pets = createPets({ getPool: currentPool, onSettings: openSettings });
+if (location.search.includes('debug')) window.game = { farm, pets }; // for automated tests
+
+// ---------- Farm <-> pets ----------
+let mode = farm;
+function updateModeButton() {
+  const toPets = mode === farm;
+  const b = $('btnMode');
+  b.classList.toggle('to-farm', !toPets);
+  b.classList.remove('bump');
+  b.querySelector('.e').textContent = toPets ? '🐾' : '🌱';
+  b.querySelector('.t').textContent = toPets ? 'Pets' : 'Farm';
+  b.setAttribute('aria-label', toPets ? 'Go to the pets' : 'Go to the farm');
+  $('modeDot').hidden = !(toPets && petState.eggs > 0);
+}
+function switchMode() {
+  mode.exit();
+  hush();
+  mode = mode === farm ? pets : farm;
+  sfx.pop();
+  resize();
+  mode.enter();
+  updateModeButton();
+}
+$('btnMode').onclick = switchMode;
 
 // ---------- Grown-up settings ----------
 function openSettings() {
-  farm.pause();
+  mode.pause();
   hush();
   $('settings').hidden = false;
   renderSettings();
@@ -102,11 +128,11 @@ $('tIrregular').onclick = () => { settings.irregular = !settings.irregular; upda
 $('tDecodable').onclick = () => { settings.decodable = !settings.decodable; update(); };
 
 // ---------- Input ----------
-canvas.addEventListener('pointerdown', e => farm.onPointer(e));
-window.addEventListener('keydown', e => { if (e.key === 'Escape') farm.pause(); });
+canvas.addEventListener('pointerdown', e => mode.onPointer(e));
+window.addEventListener('keydown', e => { if (e.key === 'Escape') mode.pause(); });
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) return;
-  farm.pause();
+  mode.pause();
   hush();
 });
 
@@ -114,7 +140,7 @@ document.addEventListener('visibilitychange', () => {
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
-  farm.resize(w / h);
+  mode.resize(w / h);
 }
 window.addEventListener('resize', resize);
 
@@ -123,16 +149,16 @@ let t = 0;
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
   t += dt;
-  farm.update(dt, t);
+  mode.update(dt, t);
   updateParticles(dt);
-  renderer.render(farm.scene, farm.camera);
+  renderer.render(mode.scene, mode.camera);
   requestAnimationFrame(tick);
 }
 
 // ---------- Boot ----------
 (async () => {
   try {
-    await Promise.all([document.fonts.load('700 100px Andika'), farm.load(), loadVoice()]);
+    await Promise.all([document.fonts.load('700 100px Andika'), farm.load(), pets.load(), loadVoice()]);
   } catch (err) {
     console.error(err);
     $('loading').querySelector('p').textContent = 'Oh no, something did not load. Try refreshing!';
@@ -140,6 +166,8 @@ function tick() {
   }
   resize();
   $('loading').hidden = true;
+  $('hud').hidden = false;
+  updateModeButton();
   farm.enter();
   if (!currentPool().length) openSettings();
   tick();

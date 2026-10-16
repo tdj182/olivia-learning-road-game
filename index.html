@@ -28,11 +28,15 @@
 
   <div id="loading"><div class="spinner"></div><p>Getting the farm ready…</p></div>
 
-  <div id="farm" class="mode-ui" hidden>
-    <button id="btnSettings" class="round corner-left" aria-label="Grown-up settings">⚙️</button>
+  <div id="hud" class="mode-ui" hidden>
+    <div class="corner-left hud-row">
+      <button id="btnSettings" class="round" aria-label="Grown-up settings">⚙️</button>
+      <button id="btnMode" class="mode-btn" aria-label="Go to the pets"><span class="e">🐾</span><span class="t">Pets</span><i id="modeDot" hidden></i></button>
+    </div>
     <div class="corner-right hud-stack">
       <div id="stars" class="pill-count"><span>⭐</span><span id="starCount">0</span></div>
       <div id="basket" class="pill-count basket"></div>
+      <div id="eggs" class="pill-count" hidden><span>🥚</span><span id="eggCount">0</span></div>
     </div>
 
     <div id="seeds" class="sheet" hidden>
@@ -81,7 +85,7 @@
       </section>
 
       <p class="total">Total stars: ⭐ <span id="totalStars">0</span></p>
-      <button id="btnSettingsDone" class="big">Back to the farm 🌱</button>
+      <button id="btnSettingsDone" class="big">Let's play! 🌱</button>
       <p id="offlineReady" class="hint" hidden>✓ Ready to play offline</p>
     </div>
   </div>
