@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#160c3a">
+  <meta name="theme-color" content="#9fd8ff">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Word Road">
+  <meta name="apple-mobile-web-app-title" content="Word Farm">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <title>Olivia's Word Road</title>
+  <title>Olivia's Word Farm</title>
   <link rel="stylesheet" href="vendor/fonts/fonts.css">
   <link rel="stylesheet" href="style.css">
   <script type="importmap">
@@ -26,97 +26,30 @@
 <body>
   <canvas id="c"></canvas>
 
-  <div id="loading"><div class="spinner"></div><p>Getting ready…</p></div>
+  <div id="loading"><div class="spinner"></div><p>Getting the farm ready…</p></div>
 
-  <div id="hud" hidden>
-    <div class="hud-left">
-      <button id="btnHome" class="round" aria-label="Home">🏠</button>
-      <button id="btnPause" class="round" aria-label="Pause">⏸️</button>
+  <div id="farm" class="mode-ui" hidden>
+    <button id="btnSettings" class="round corner-left" aria-label="Grown-up settings">⚙️</button>
+    <div class="corner-right hud-stack">
+      <div id="stars" class="pill-count"><span>⭐</span><span id="starCount">0</span></div>
+      <div id="basket" class="pill-count basket"></div>
     </div>
-    <div id="target">
-      <span class="label">Find</span>
-      <span id="targetWord"></span>
-      <button id="btnSay" class="round small" aria-label="Say the word again">🔊</button>
-    </div>
-    <div class="hud-right">
-      <div id="stars"><span class="star">⭐</span><span id="starCount">0</span></div>
-      <div id="streak" class="streak" hidden></div>
-      <button id="bag" class="bag" aria-label="Potion Lab"><span>🧺</span><span id="bagCount">0</span><span class="go">🧪</span></button>
-    </div>
-    <div id="stick" class="stick" aria-label="Joystick"><div class="knob"></div></div>
-    <button id="btnFire" class="fire-btn" aria-label="Fire">💥</button>
-    <div id="flyHint" class="fly-hint">🕹️ Steer · 💥 Blast · Tap twice to zoom!</div>
-    <div id="toast"></div>
-    <div id="banner"></div>
-  </div>
 
-  <div id="lab" class="mode-ui" hidden>
-    <button id="btnLabHome" class="round corner-left" aria-label="Home">🏠</button>
-    <div class="mode-title">🧪 Potion Lab</div>
-    <div class="corner-right shelf-count" title="Potions"><span>🧪</span><span id="labPotionCount">0</span></div>
-    <div id="magic" class="magic" hidden>
-      <div class="magic-title">✨ <span id="magicPrompt">Find the magic word!</span> <button id="btnMagicSay" class="round" aria-label="Say it again">🔊</button></div>
-      <div id="magicBubbles" class="magic-bubbles"></div>
-    </div>
-    <svg id="stirRing" class="stir-ring" viewBox="0 0 100 100" hidden aria-hidden="true">
-      <circle cx="50" cy="50" r="46" pathLength="100" class="track" />
-      <circle id="stirArc" cx="50" cy="50" r="46" pathLength="100" class="arc" />
-    </svg>
-    <div class="lab-bottom">
-      <p id="labMsg" class="lab-msg"></p>
-      <div id="labSlots" class="slots"></div>
-      <div id="labTray" class="tray"></div>
-      <div class="lab-actions small">
-        <button id="btnLabLearn" class="pill">📚 Read words</button>
-        <button id="btnLabBattle" class="pill hot">⚔️ Monster Battle</button>
+    <div id="seeds" class="sheet" hidden>
+      <div class="sheet-head">
+        <span id="seedTitle" class="sheet-title">🌱 Find the seed!</span>
+        <button id="btnSeedSay" class="round small" aria-label="Say it again">🔊</button>
+        <button id="btnSeedClose" class="round small" aria-label="Close">✖️</button>
       </div>
+      <div id="seedRow" class="seed-row"></div>
     </div>
+
   </div>
 
-  <div id="battle" class="mode-ui" hidden>
-    <button id="btnBattleHome" class="round corner-left" aria-label="Home">🏠</button>
-    <div class="mode-title"><span id="waveLabel">Wave 1/5</span> · 👾 <span id="killCount">0</span></div>
-    <div id="hearts" class="corner-right hearts"></div>
-    <div id="battleHint" class="battle-hint">Tap a monster to zap it! 👆</div>
-    <div id="battleBanner" class="battle-banner"></div>
-    <div id="potionBar" class="potion-bar"></div>
-    <div id="battleEnd" class="overlay" hidden>
-      <div class="card">
-        <h2 id="battleEndText"></h2>
-        <p id="battleEndSub" class="end-sub"></p>
-        <button id="btnBattleAgain" class="big">Try again! ⚔️</button>
-        <p class="fun-row">
-          <button id="btnBattleLearn" class="pill">📚 Read words</button>
-          <button id="btnBattleLab" class="pill">🧪 Make potions</button>
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <div id="pauseOverlay" hidden>
-    <div class="card">
-      <h2>Taking a break</h2>
-      <div class="speed-row">
-        <span class="speed-label">Speed</span>
-        <button id="pauseSpeedDown" class="chip" aria-label="Slower">🐢</button>
-        <span id="pauseSpeedValue" class="speed-value">5</span>
-        <button id="pauseSpeedUp" class="chip" aria-label="Faster">🐇</button>
-      </div>
-      <button id="btnResume" class="big">Keep going!</button>
-      <p><button id="btnPauseHome" class="link">Back to the start</button></p>
-    </div>
-  </div>
-
-  <div id="menu" hidden>
+  <div id="settings" class="overlay settings" hidden>
     <div class="card menu-card">
-      <h1><span>Olivia's</span> Word Road</h1>
-      <p class="sub">Listen, then go through the right word!</p>
-
-      <button id="btnPlay" class="big">Blast off! 🚀</button>
-      <div class="fun-row">
-        <button id="btnMenuLab" class="pill">🧪 Potion Lab <small id="menuBag"></small></button>
-        <button id="btnMenuBattle" class="pill hot">⚔️ Monster Battle <small id="menuPotions"></small></button>
-      </div>
+      <h1><span>Olivia's</span> Word Farm</h1>
+      <p class="sub">Grown-up settings</p>
 
       <section>
         <h3>Practice</h3>
@@ -130,47 +63,16 @@
         <h3 id="rangeTitle">Modules</h3>
         <div id="moduleChips" class="chips"></div>
         <div class="row-links"><button id="selAll" class="link">All</button><button id="selNone" class="link">None</button></div>
-      </section>
-
-      <section>
-        <div class="chips">
+        <div class="chips type-row">
           <button class="chip" id="tIrregular" aria-pressed="true">❤️ Irregular</button>
           <button class="chip" id="tDecodable" aria-pressed="true">🔤 Decodable</button>
-          <button class="chip" id="tShow" aria-pressed="true">👀 Show it</button>
         </div>
         <p id="poolInfo" class="hint"></p>
       </section>
 
       <section>
-        <h3>Challenge</h3>
-        <div class="speed-row">
-          <span class="speed-label">Speed</span>
-          <button id="speedDown" class="chip" aria-label="Slower">🐢</button>
-          <span id="speedValue" class="speed-value">5</span>
-          <button id="speedUp" class="chip" aria-label="Faster">🐇</button>
-        </div>
-        <div class="chips labeled">
-          <span class="speed-label">Words</span>
-          <span id="choiceChips" class="chips"></span>
-          <button class="chip" id="tRocks" aria-pressed="true">🪨 Space rocks</button>
-        </div>
-        <div class="chips labeled spell-row">
-          <span class="speed-label">Steering</span>
-          <span id="steerChips" class="chips"></span>
-        </div>
-        <div class="chips spell-row">
-          <button class="chip" id="tSpell" aria-pressed="false">✏️ Spell it (hard)</button>
-        </div>
-      </section>
-
-      <section>
-        <h3>World</h3>
-        <div id="worldChips" class="chips"></div>
-      </section>
-
-      <section id="playerSection">
-        <h3>Player</h3>
-        <div id="shipChips" class="chips"></div>
+        <h3>Choices each time</h3>
+        <div id="choiceChips" class="chips"></div>
       </section>
 
       <section id="trickySection" hidden>
@@ -179,6 +81,7 @@
       </section>
 
       <p class="total">Total stars: ⭐ <span id="totalStars">0</span></p>
+      <button id="btnSettingsDone" class="big">Back to the farm 🌱</button>
       <p id="offlineReady" class="hint" hidden>✓ Ready to play offline</p>
     </div>
   </div>

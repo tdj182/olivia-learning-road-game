@@ -1,7 +1,7 @@
 {
-  "name": "Olivia's Word Road",
-  "short_name": "Word Road",
-  "description": "A space flying game for practicing kindergarten words and numbers, with potions and monster battles.",
+  "name": "Olivia's Word Farm",
+  "short_name": "Word Farm",
+  "description": "A farm game for practicing kindergarten words and numbers: plant seeds, read the signs out loud, pick the crops.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

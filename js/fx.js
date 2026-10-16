@@ -148,27 +148,11 @@ export const sfx = {
   oops: () => { tone(392, 0, 0.22, 'sine', 0.12); tone(311, 0.2, 0.35, 'sine', 0.12); },
   fanfare: () => [523, 659, 784, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.12, 0.35, 'square', 0.07)),
   plop: () => { tone(220, 0, 0.12, 'sine', 0.2); tone(440, 0.05, 0.15, 'sine', 0.1); },
-  brew: () => [392, 494, 587, 698, 784, 880, 988, 1175].forEach((f, i) => tone(f, i * 0.1, 0.3, 'triangle', 0.1)),
-  stir: () => tone(170 + Math.random() * 90, 0, 0.14, 'sine', 0.14),
-  whoosh: () => [700, 600, 500, 420].forEach((f, i) => tone(f, i * 0.04, 0.08, 'sine', 0.06)),
+  splash: () => { noise(0, 0.35, 0.18, 2500); [880, 1175].forEach((f, i) => tone(f, 0.05 + i * 0.06, 0.12, 'sine', 0.06)); },
+  pop: () => sweep(400, 1200, 0, 0.12, 'sine', 0.12),
+  listen: () => [660, 880].forEach((f, i) => tone(f, i * 0.08, 0.12, 'sine', 0.08)),
   chirp: () => [880, 1175, 1568].forEach((f, i) => tone(f, i * 0.07, 0.14, 'sine', 0.08)),
-  boom: () => { noise(0, 0.45, 0.35, 1200); sweep(220, 50, 0, 0.4, 'square', 0.08); },
-  boost: () => { sweep(200, 900, 0, 0.5, 'sawtooth', 0.06); noise(0, 0.6, 0.15, 3000); },
-  laser: () => sweep(1800, 600, 0, 0.1, 'square', 0.04),
-  letter: () => [784, 1047].forEach((f, i) => tone(f, i * 0.06, 0.15, 'triangle', 0.12)),
-  bonk: () => { tone(110, 0, 0.25, 'square', 0.1); noise(0, 0.25, 0.3, 700); },
-  pew: () => sweep(1500, 420, 0, 0.16, 'triangle', 0.09),
-  hit: () => { noise(0, 0.08, 0.18, 2500); tone(260, 0, 0.08, 'square', 0.05); },
-  fire: () => { noise(0, 0.7, 0.35, 900); sweep(320, 70, 0, 0.6, 'sawtooth', 0.06); },
-  freeze: () => { [1568, 2093, 2637, 3136].forEach((f, i) => tone(f, i * 0.05, 0.45, 'triangle', 0.05)); noise(0, 0.3, 0.1, 6000); },
-  zap: () => { for (let i = 0; i < 5; i++) sweep(2400, 180, i * 0.045, 0.09, 'sawtooth', 0.05); noise(0, 0.25, 0.12, 4000); },
-  goo: () => { sweep(520, 80, 0, 0.4, 'sine', 0.22); tone(140, 0.12, 0.25, 'sine', 0.12); },
-  rainbow: () => [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, i * 0.06, 0.5, 'triangle', 0.08)),
-  die: () => sweep(700, 140, 0, 0.35, 'triangle', 0.1),
   coin: () => { tone(988, 0, 0.08, 'square', 0.05); tone(1319, 0.07, 0.2, 'square', 0.05); },
-  hurt: () => { sweep(320, 80, 0, 0.5, 'square', 0.1); noise(0, 0.3, 0.2, 500); },
-  roar: () => { sweep(180, 60, 0, 1.0, 'sawtooth', 0.12); noise(0, 0.9, 0.25, 500); },
-  lose: () => [392, 349, 311, 262].forEach((f, i) => tone(f, i * 0.22, 0.4, 'triangle', 0.1)),
 };
 
 // ---------- Speech ----------
@@ -270,13 +254,24 @@ export function say(parts, { interrupt = true } = {}) {
   if (interrupt) { stopClips(); window.speechSynthesis?.cancel(); }
   const missing = clipIndex ? keys.filter(k => !clipIndex[k]) : keys;
   if (!missing.length) {
-    playClips(keys, interrupt).catch(() => speakBuiltIn(texts, false));
+    lastPlay = playClips(keys, interrupt).catch(() => speakBuiltIn(texts, false));
     return;
   }
   for (const k of missing) if (clipIndex && !warned.has(k)) { warned.add(k); console.warn(`No voice clip for "${k}"`); }
   speakBuiltIn(texts, interrupt);
 }
 export const sayWord = w => say([w]);
+
+// Resolves once the game has finished talking (so the microphone doesn't hear it).
+let lastPlay = Promise.resolve();
+export async function speechDone() {
+  await lastPlay;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const left = actx ? clipQueueEnd - actx.currentTime : 0;
+  if (left > 0) await wait(left * 1000);
+  while (window.speechSynthesis?.speaking || window.speechSynthesis?.pending) await wait(100);
+  await wait(150);
+}
 export function hush() {
   stopClips();
   window.speechSynthesis?.cancel();
@@ -287,7 +282,7 @@ if (navigator.audioSession) { try { navigator.audioSession.type = 'playback'; } 
 window.addEventListener('pointerdown', () => { try { audio().resume(); } catch { /* audio unavailable */ } }, { capture: true });
 
 // ---------- DOM bits ----------
-// Little emoji that flies across the screen (ingredients into the bag / pot).
+// Little emoji that flies across the screen (seeds to a patch, crops to the basket).
 export function flyEmoji(emoji, from, to, done) {
   const e = document.createElement('div');
   e.className = 'fly-emoji';
