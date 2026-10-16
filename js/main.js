@@ -107,7 +107,7 @@ function renderSettings() {
   }
   const secs = BATTLE_SPEEDS[settings.battleSpeed];
   const lap = Math.floor(battleState.stage / ENEMIES.length);
-  $('battleInfo').textContent = `${secs ? `${Math.round(ENEMIES.at(-1).time * secs)}–${Math.round(ENEMIES[0].time * secs)} seconds per word. ` : 'No time limit. '}Battles won: ${battleState.stage}${lap ? ` (round ${lap + 1})` : ''}`;
+  $('battleInfo').textContent = `${secs ? `${Math.round(ENEMIES.at(-1).time * secs)}–${Math.round(ENEMIES[0].time * secs)} seconds per word. ` : 'No time limit. '}Battles won: ${battleState.wins}. Next: ${ENEMIES[battleState.stage % ENEMIES.length].name.replace(/^the /, '')}${lap ? ` (round ${lap + 1})` : ''}.`;
 
   const choiceChips = $('choiceChips');
   choiceChips.innerHTML = '';

@@ -287,6 +287,7 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     burst(foe.f.root.position.clone().add(new THREE.Vector3(0, 1.5, 0)), 90, CONFETTI, scene, 1.2);
     for (let i = 0; i < WIN_STARS; i++) progress.addStar();
     battle.stage++;
+    battle.wins++;
     saveBattle();
     afterBattle();
     renderHud();
@@ -302,6 +303,9 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     closeChoice();
     play(foe.f, 'happy');
     afterBattle();
+    // Back to the first monster of this round.
+    battle.stage -= battle.stage % ENEMIES.length;
+    saveBattle();
     say([LINES.lost]);
     await sleep(1500);
     if (my !== run) return;
@@ -314,7 +318,7 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     $('beTitle').textContent = won ? 'You won!' : 'The monster won!';
     $('beText').textContent = won ? `+${WIN_STARS} ⭐` : 'Feed your pets and try again!';
     const next = enemyFor(battle.stage);
-    $('beAgain').textContent = won ? `Next: ${next.e.boss ? '👑 ' : ''}${next.e.name.replace(/^the /, '')} ⚔️` : 'Try again ⚔️';
+    $('beAgain').textContent = `${won ? 'Next' : 'Start again'}: ${next.e.boss ? '👑 ' : ''}${next.e.name.replace(/^the /, '')} ⚔️`;
     $('beAgain').hidden = !pets.owned.some(ready);
     if (!won && $('beAgain').hidden) $('beText').textContent = 'Your pets need food and rest!';
   }

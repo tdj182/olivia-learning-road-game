@@ -106,8 +106,11 @@ export function setHealth(p, hp) {
   p.hurt = Math.max(0, petHp(p) - hp);
 }
 
-// stage: battles won so far (the monster is ENEMIES[stage % ENEMIES.length]).
+// stage: place on the monster ladder (the monster is ENEMIES[stage % ENEMIES.length], and every
+// lap of the ladder is a tougher round). A loss goes back to the first monster of the round.
+// wins: battles won ever.
 export const battle = Object.assign({ stage: 0 }, store.get('owr-battle', {}));
+battle.wins ??= battle.stage;
 export const saveBattle = () => store.set('owr-battle', battle);
 
 const eggsLeft = () => CREATURES.length - pets.owned.length - pets.eggs;
