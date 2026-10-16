@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { MODULES, NUMBER_RANGES, buildPool, buildNumberPool } from './words.js';
-import { settings, saveSettings, stats, progress, pets as petState } from './state.js';
+import { settings, saveSettings, stats, progress, pets as petState, battle as battleState } from './state.js';
 import { updateParticles, hush, loadVoice, sfx } from './fx.js';
 import { createFarm } from './farm.js';
 import { createPets } from './pets.js';
+import { createBattle } from './battle.js';
+import { BATTLE_SPEEDS, ENEMIES } from './creatures.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('c');
@@ -19,31 +21,36 @@ const isNumbers = () => settings.mode === 'numbers';
 const currentPool = () => (isNumbers() ? buildNumberPool(settings.numberRanges) : buildPool(settings.modules, settings));
 
 const farm = createFarm({ getPool: currentPool, onSettings: openSettings, onEgg: () => { updateModeButton(); $('btnMode').classList.add('bump'); } });
-const pets = createPets({ getPool: currentPool, onSettings: openSettings });
-if (location.search.includes('debug')) window.game = { farm, pets }; // for automated tests
+const pets = createPets({ getPool: currentPool, onSettings: openSettings, onChange: () => updateModeButton() });
+const battle = createBattle({ getPool: currentPool, onSettings: openSettings, onEnd: () => switchMode(pets) });
+if (location.search.includes('debug')) window.game = { farm, pets, battle }; // for automated tests
 
-// ---------- Farm <-> pets ----------
+// ---------- Farm <-> pets -> battle ----------
+// The mode button goes farm -> pets, pets -> farm, and battle -> pets (running away).
 let mode = farm;
 function updateModeButton() {
-  const toPets = mode === farm;
+  const toPets = mode !== pets;
   const b = $('btnMode');
   b.classList.toggle('to-farm', !toPets);
   b.classList.remove('bump');
   b.querySelector('.e').textContent = toPets ? '🐾' : '🌱';
   b.querySelector('.t').textContent = toPets ? 'Pets' : 'Farm';
   b.setAttribute('aria-label', toPets ? 'Go to the pets' : 'Go to the farm');
-  $('modeDot').hidden = !(toPets && petState.eggs > 0);
+  $('modeDot').hidden = !(mode === farm && petState.eggs > 0);
+  $('btnBattle').hidden = !(mode === pets && petState.owned.length);
+  $('hud').classList.toggle('battle', mode === battle);
 }
-function switchMode() {
+function switchMode(to = mode === pets ? farm : pets) {
   mode.exit();
   hush();
-  mode = mode === farm ? pets : farm;
+  mode = to;
   sfx.pop();
   resize();
   mode.enter();
   updateModeButton();
 }
-$('btnMode').onclick = switchMode;
+$('btnMode').onclick = () => switchMode();
+$('btnBattle').onclick = () => switchMode(battle);
 
 // ---------- Grown-up settings ----------
 function openSettings() {
@@ -82,6 +89,20 @@ function renderSettings() {
   $('tDecodable').hidden = numbers;
   $('tIrregular').setAttribute('aria-pressed', settings.irregular);
   $('tDecodable').setAttribute('aria-pressed', settings.decodable);
+
+  const speedChips = $('speedChips');
+  speedChips.innerHTML = '';
+  for (const [id, label] of [['off', 'Off'], ['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']]) {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = label;
+    b.setAttribute('aria-pressed', settings.battleSpeed === id);
+    b.onclick = () => { settings.battleSpeed = id; update(); };
+    speedChips.appendChild(b);
+  }
+  const secs = BATTLE_SPEEDS[settings.battleSpeed];
+  const lap = Math.floor(battleState.stage / ENEMIES.length);
+  $('battleInfo').textContent = `${secs ? `${Math.round(ENEMIES.at(-1).time * secs)}–${Math.round(ENEMIES[0].time * secs)} seconds per word. ` : 'No time limit. '}Battles won: ${battleState.stage}${lap ? ` (round ${lap + 1})` : ''}`;
 
   const choiceChips = $('choiceChips');
   choiceChips.innerHTML = '';
@@ -158,7 +179,7 @@ function tick() {
 // ---------- Boot ----------
 (async () => {
   try {
-    await Promise.all([document.fonts.load('700 100px Andika'), farm.load(), pets.load(), loadVoice()]);
+    await Promise.all([document.fonts.load('700 100px Andika'), farm.load(), pets.load(), battle.load(), loadVoice()]);
   } catch (err) {
     console.error(err);
     $('loading').querySelector('p').textContent = 'Oh no, something did not load. Try refreshing!';

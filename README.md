@@ -23,6 +23,19 @@ The **🐾 Pets** button (top left) goes to the pet yard, and **🌱 Farm** goes
 
 Pets and tuning (hearts to evolve, belly size and timing, eggs per crop, cracks per egg) are in `js/creatures.js`.
 
+## Battles
+
+Once she has a pet, the **⚔️ Battle** button (bottom right of the pet yard) sends her 3 strongest pets against a wild monster. Fighting *is* the reading:
+
+- ⚡ The game says a word ("Find the word that says…"). Finding it makes her pet attack. On the first try it's full damage. After a miss it's weaker.
+- 💥 Three first-try words in a row is a **super attack** (double damage).
+- ⏱ A wrong tap, or running out of time (the bar under the monster's health), lets the monster attack her pet.
+- 😴 A pet with no health left is tired and the next pet comes in. When all of them are tired, the monster wins. Pets are never hurt for good.
+- 🏆 A win gives 3 ⭐ and unlocks the next monster. There are 8: Blobby, Prickles, Hopper, Squiddy, Boo, Ninja, Grumble, and the Mushroom King (boss). After the boss the ladder starts over, with each monster 40% tougher.
+- Pets with more ❤️ have more health and hit harder, and evolved pets much more so. A hungry pet (🍎) hits softer, and every battle makes the pets that fought hungrier. So farming and feeding matter.
+
+**Battle timer** (grown-up settings): Off, Slow, Normal or Fast. Normal gives 7–10 seconds per word depending on the monster. The settings also show how many battles she has won. Monster health, damage and time are in `ENEMIES` in `js/creatures.js`.
+
 ### Grown-up settings (⚙️, top left)
 
 - **Words / Numbers**, modules or number groups, and irregular/decodable word types.
@@ -61,7 +74,9 @@ Plain HTML/JS with [three.js](https://threejs.org) copied into `vendor/`, so the
 - `js/farm.js`: the farm scene and the plant / water / pick game. Tuning at the top.
 - `js/crops.js`: crops and growth stages
 - `js/pets.js`: the pet yard: hatching, feeding, evolving
-- `js/creatures.js`: the pets and their tuning
+- `js/battle.js`: battles
+- `js/creature3d.js`: sizing and animating the monster models
+- `js/creatures.js`: the pets, the battle monsters, and their tuning
 - `js/ui.js`: the HUD and the shared hear-it-find-it choice sheet
 - `js/practice.js`: picking practice words and look-alike choices
 - `js/words.js`: the word lists
@@ -71,7 +86,7 @@ Plain HTML/JS with [three.js](https://threejs.org) copied into `vendor/`, so the
 - `js/fx.js`: shared sounds, speech, particles
 - `tools/icon.html` draws the app icons.
 
-3D models are by [Quaternius](https://quaternius.com) (CC0). See `assets/models/LICENSE-Quaternius.txt`. The farm models (`assets/models/farm/*.glb`) were converted from the Nature Crops and Farm Buildings OBJ packs with Blender. The pets (`assets/models/pets/*.glb`) are from Ultimate Monsters, converted with [glTF-Transform](https://gltf-transform.dev) (unused animations dropped, resampled, quantized).
+3D models are by [Quaternius](https://quaternius.com) (CC0). See `assets/models/LICENSE-Quaternius.txt`. The farm models (`assets/models/farm/*.glb`) were converted from the Nature Crops and Farm Buildings OBJ packs with Blender. The pets and battle monsters (`assets/models/pets/*.glb`, `assets/models/enemies/*.glb`) are from Ultimate Monsters, converted with [glTF-Transform](https://gltf-transform.dev) (unused animations dropped, resampled, quantized).
 
 ### Parked: reading out loud
 

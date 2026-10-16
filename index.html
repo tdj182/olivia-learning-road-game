@@ -39,6 +39,23 @@
       <div id="eggs" class="pill-count" hidden><span>🥚</span><span id="eggCount">0</span></div>
     </div>
 
+    <button id="btnBattle" class="battle-btn" hidden><span>⚔️</span>Battle</button>
+
+    <div id="battleBars" class="battle-bars" hidden>
+      <div class="fighter mine">
+        <div class="fname"><span id="bPetName"></span><span id="bHungry" class="hungry" hidden>🍎 hungry</span></div>
+        <div class="hp"><i id="bPetHp"></i><b id="bPetNum"></b></div>
+        <div id="bTeam" class="team"></div>
+      </div>
+      <div class="vs">VS</div>
+      <div class="fighter foe">
+        <div class="fname" id="bFoeName"></div>
+        <div class="hp"><i id="bFoeHp"></i><b id="bFoeNum"></b></div>
+        <div id="bTimerWrap" class="timer" title="Time"><i id="bTimer"></i></div>
+      </div>
+      <p id="bLoading" class="b-loading" hidden>Here it comes…</p>
+    </div>
+
     <div id="seeds" class="sheet" hidden>
       <div class="sheet-head">
         <span id="seedTitle" class="sheet-title">🌱 Find the seed!</span>
@@ -48,6 +65,18 @@
       <div id="seedRow" class="seed-row"></div>
     </div>
 
+  </div>
+
+  <div id="battleEnd" class="overlay" hidden>
+    <div class="card end-card">
+      <div id="beEmoji" class="end-emoji">🏆</div>
+      <h2 id="beTitle">You won!</h2>
+      <p id="beText"></p>
+      <div class="end-buttons">
+        <button id="beAgain" class="big">Next ⚔️</button>
+        <button id="beBack" class="big alt">🐾 Pets</button>
+      </div>
+    </div>
   </div>
 
   <div id="settings" class="overlay settings" hidden>
@@ -77,6 +106,12 @@
       <section>
         <h3>Choices each time</h3>
         <div id="choiceChips" class="chips"></div>
+      </section>
+
+      <section>
+        <h3>Battle timer</h3>
+        <div id="speedChips" class="chips"></div>
+        <p id="battleInfo" class="hint"></p>
       </section>
 
       <section id="trickySection" hidden>

@@ -31,12 +31,14 @@ export const choosing = () => !!current;
 
 // pool: words to pick from (avoid: not this one, avoidAll: none of these if possible).
 // icon(j): emoji for button j. data(j): extra dataset values for button j.
-// done(button, from): called after the right tap, with the button's screen center.
-export function ask({ pool, avoid, avoidAll = [], title, line, cls, icon, data = () => ({}), done }) {
+// done(button, from, misses): called after the right tap, with the button's screen center.
+// wrong(button): called after a wrong tap. closable: false hides the ✖️ (battles).
+export function ask({ pool, avoid, avoidAll = [], title, line, cls, icon, data = () => ({}), done, wrong, closable = true }) {
   const fresh = pool.filter(w => !avoidAll.includes(w));
   const target = pickWord(fresh.length ? fresh : pool, avoid);
   const words = shuffle([target, ...pickDistractors(pool, target, settings.choices - 1)]);
-  current = { target, misses: 0, done };
+  current = { target, misses: 0, done, wrong };
+  $('btnSeedClose').hidden = !closable;
   $('seedTitle').textContent = title;
   const row = $('seedRow');
   row.innerHTML = '';
@@ -64,14 +66,20 @@ function choose(b) {
     b.classList.add('wrong');
     say([LINES.oopsSays, b.dataset.word, LINES.letsFind, target, LINES.again]);
     if (current.misses >= 2) $('seedRow').querySelector(`[data-word="${CSS.escape(target)}"]`)?.classList.add('hint');
+    current.wrong?.(b);
     return;
   }
-  markWord(target, current.misses === 0);
+  const missed = current.misses;
+  markWord(target, missed === 0);
   sfx.good();
   const r = b.getBoundingClientRect();
   closeChoice();
-  done(b, { x: r.left + r.width / 2, y: r.top + r.height / 2 });
+  done(b, { x: r.left + r.width / 2, y: r.top + r.height / 2 }, missed);
 }
+
+export const misses = () => current?.misses ?? 0;
+export const currentTarget = () => current?.target;
+export const sayTarget = (before = []) => current && say([...before, current.target]);
 
 export function closeChoice() {
   current = null;

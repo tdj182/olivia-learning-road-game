@@ -2,7 +2,7 @@
 // line, word and number here, so keep spoken text in this file.
 import { ALL_WORDS } from './words.js';
 import { CROPS } from './crops.js';
-import { CREATURES } from './creatures.js';
+import { CREATURES, ENEMIES } from './creatures.js';
 
 export const LINES = {
   welcome: 'Welcome to your farm, Olivia! Tap a garden patch to plant a seed.',
@@ -24,6 +24,12 @@ export const LINES = {
   feedWhich: 'Find the food that says',
   noFood: 'Your pets are hungry! Go pick food on the farm.',
   full: "I'm full! Thank you!",
+  attackWhich: 'Find the word that says',
+  tooSlow: 'Too slow!',
+  superAttack: 'Super attack!',
+  tired: 'Your pet is tired!',
+  won: 'You won! Your pets are so strong!',
+  lost: 'Oh no! The monster won. Feed your pets and try again!',
 };
 export const PRAISE = ['Great job!', 'You got it!', 'Awesome!', 'Super reading!', 'Yes!', 'Way to go!', 'Wonderful!'];
 
@@ -37,7 +43,8 @@ export function allLines() {
     ...Array.from({ length: 100 }, (_, i) => ({ text: String(i + 1), slow: true })),
     ...[...Object.values(LINES), ...PRAISE].map(text => ({ text })),
     ...CROPS.map(c => ({ text: c.picked })),
-    ...CREATURES.flatMap(c => [{ text: `${c.name}!` }, { text: c.hatched }, { text: c.evolved }]),
+    ...CREATURES.flatMap(c => [{ text: `${c.name}!` }, { text: c.hatched }, { text: c.evolved }, { text: c.go }]),
+    ...ENEMIES.map(e => ({ text: e.appears })),
   ];
   const seen = new Set();
   return lines.filter(l => { const k = voiceKey(l.text); if (seen.has(k)) return false; seen.add(k); return true; });

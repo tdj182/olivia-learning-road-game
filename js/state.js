@@ -14,6 +14,7 @@ const saved = store.get('owr-settings', {});
 export const settings = {
   mode: 'words', modules: [1, 2, 3, 4, 5, 6, 7, 8, 9], numberRanges: [1, 2], irregular: true, decodable: true,
   choices: 3,  // words to pick from each time: 3, 4 or 5
+  battleSpeed: 'normal', // time per word in battles: off, slow, normal, fast (creatures.js BATTLE_SPEEDS)
 };
 for (const k of Object.keys(settings)) if (k in saved) settings[k] = saved[k];
 export const saveSettings = () => store.set('owr-settings', settings);
@@ -51,6 +52,10 @@ export function setBelly(p, n) {
   p.belly = n;
   p.at = Date.now();
 }
+
+// stage: battles won so far (the monster is ENEMIES[stage % ENEMIES.length]).
+export const battle = Object.assign({ stage: 0 }, store.get('owr-battle', {}));
+export const saveBattle = () => store.set('owr-battle', battle);
 
 const eggsLeft = () => CREATURES.length - pets.owned.length - pets.eggs;
 

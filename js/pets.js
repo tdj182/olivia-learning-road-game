@@ -5,6 +5,7 @@ import { farm, saveFarm, pets, savePets, belly, setBelly } from './state.js';
 import { LINES, PRAISE } from './lines.js';
 import { loadModel, normalize, burst, sfx, say, flyEmoji, floatText, toScreen, CONFETTI } from './fx.js';
 import { ask, choosing, closeChoice, renderHud, bump } from './ui.js';
+import { buildCreature, play, looping } from './creature3d.js';
 
 // ---------- Tuning ----------
 const PENS = { wide: [12, 7.5], tall: [6, 10] }; // the fenced yard the pets roam in (width, depth)
@@ -18,20 +19,9 @@ const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.f
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const rand = (a, b) => a + Math.random() * (b - a);
 
-// Animation names in the monster models, best first.
-const CLIPS = {
-  idle: ['Idle', 'Flying_Idle'],
-  move: ['Walk', 'Fast_Flying'],
-  happy: ['Dance', 'Yes', 'Wave'],
-  yes: ['Yes'],
-  no: ['No'],
-  eat: ['Bite_Front', 'Headbutt', 'Punch'],
-  jump: ['Jump', 'Yes'],
-};
-
 // The pet yard: pets she hatched wander around a fenced pen, with a nest of eggs to hatch.
 // Tap a pet to feed it (find the word on the food); tap the egg to crack it (find the word on the egg).
-export function createPets({ getPool, onSettings }) {
+export function createPets({ getPool, onSettings, onChange }) {
   // ---------- Scene ----------
   const SKY = new THREE.Color('#a8ddff');
   const scene = new THREE.Scene();
@@ -141,49 +131,26 @@ export function createPets({ getPool, onSettings }) {
 
   async function makePet(data, at) {
     const c = creatureById(data.id);
-    const gltf = await getModel(c.model + (data.evolved ? '_Evolved' : ''));
-    const model = gltf.scene;
-    // Fit the height, but keep wide ones (wings) from getting huge.
-    const h0 = data.evolved ? GROWN_H : BABY_H;
-    const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
-    const body = normalize(model, size.y * 1.3 >= Math.max(size.x, size.z) ? { height: h0 } : { length: h0 * 1.3 });
-    const root = new THREE.Group();
-    root.add(body);
+    const pet = buildCreature(await getModel(c.model + (data.evolved ? '_Evolved' : '')), data.evolved ? GROWN_H : BABY_H);
+    const { root, h } = pet;
     root.position.copy(at ?? randomSpot());
     root.rotation.y = rand(-0.8, 0.8);
     scene.add(root);
 
-    const h = new THREE.Box3().setFromObject(body).getSize(new THREE.Vector3()).y;
     const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, h + 0.6, 10), new THREE.MeshBasicMaterial({ visible: false }));
     hit.position.y = h / 2 + (c.fly ? FLY_Y : 0);
     root.add(hit);
 
     const badge = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false }));
     badge.renderOrder = 5;
-    badge.position.y = h + (c.fly ? FLY_Y : 0) + 0.45;
     badge.scale.set(1.9, 0.48, 1);
     root.add(badge);
 
-    const pet = { data, c, root, body, hit, badge, mixer: new THREE.AnimationMixer(model), clips: gltf.animations, action: null, target: null, wait: rand(0, 3), hold: 0, h };
+    Object.assign(pet, { data, c, hit, badge, target: null, wait: rand(0, 3), hold: 0 });
+    pet.after = () => (pet.target ? 'move' : 'idle');
     hit.userData.pet = pet;
-    pet.mixer.addEventListener('finished', () => play(pet, pet.target ? 'move' : 'idle'));
-    play(pet, 'idle');
     drawBadge(pet);
     return pet;
-  }
-
-  function play(pet, kind) {
-    const clip = CLIPS[kind].map(n => pet.clips.find(c => c.name === n)).find(Boolean);
-    if (!clip) return;
-    const once = kind !== 'idle' && kind !== 'move';
-    const action = pet.mixer.clipAction(clip);
-    if (action === pet.action && !once) return;
-    action.reset();
-    action.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
-    action.clampWhenFinished = once;
-    if (pet.action && pet.action !== action) action.crossFadeFrom(pet.action, 0.2, false);
-    action.play();
-    pet.action = action;
   }
 
   // Hearts toward evolving (babies), and a 🍎 when the pet is hungry.
@@ -346,6 +313,7 @@ export function createPets({ getPool, onSettings }) {
     play(pet, 'jump');
     say([c.hatched]);
     setTimeout(showEgg, 1500);
+    onChange();
   }
 
   // ---------- Feeding ----------
@@ -416,6 +384,7 @@ export function createPets({ getPool, onSettings }) {
     addPet(grown);
     animate(0.8, k => grown.root.scale.setScalar(0.15 + 0.85 * elastic(k)));
     play(grown, 'happy');
+    onChange();
     sfx.fanfare();
     say([pet.c.evolved]);
   }
@@ -497,7 +466,7 @@ export function createPets({ getPool, onSettings }) {
         pet.target = null;
         toCam.subVectors(camera.position, pet.root.position);
         turnTo(pet, Math.atan2(toCam.x, toCam.z), dt);
-        if (pet.action && pet.action.loop === THREE.LoopRepeat) play(pet, 'idle');
+        if (looping(pet)) play(pet, 'idle');
         continue;
       }
       if (!pet.target) {
