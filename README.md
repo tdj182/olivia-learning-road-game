@@ -55,6 +55,7 @@ The monsters, in order of toughness: Blobby, Prickles, Hopper, Squiddy, Boo, Nin
 - **Choices each time:** 3, 4 or 5.
 - **Battle timer:** Off, Slow, Normal or Fast. Normal gives 7–10 seconds per word depending on the monster. It also shows battles won and this round's monsters.
 - Words to practice (the ones she misses most) and total stars.
+- **Move to another device:** 📋 Copy save code copies all progress and settings as a block of text (if copying isn't allowed, the code shows in a box to copy by hand). Send it to the other device, paste it into the box there, and tap 📥 Load save code twice. The progress it replaces goes into the 3-day backup, so Restore can undo it. Each device otherwise keeps its own progress.
 - **Start over:** takes 3 taps in a row. It clears the farm, pets, rounds, battles, stars and word stats, and keeps your settings. A backup is kept for 3 days, and **Restore** (2 taps) shows in settings until it expires. If Start over is used again during those days, the backup with more stars is kept.
 
 ## Voice

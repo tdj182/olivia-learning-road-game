@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { NUMBER_RANGES } from './words.js';
-import { settings, saveSettings, stats, progress, pets as petState, battle as battleState, startOver, restoreBackup, backupInfo, BACKUP_DAYS } from './state.js';
+import { settings, saveSettings, stats, progress, pets as petState, battle as battleState, startOver, restoreBackup, backupInfo, BACKUP_DAYS, saveCode, loadSaveCode } from './state.js';
 import { roundPool, carePool, learnProgress, LEARN_TIMES, onBattleReady, battleGate, currentRound, maxRound, setRound, quest } from './quest.js';
 import { renderHud } from './ui.js';
 import { updateParticles, hush, loadVoice, sfx, say } from './fx.js';
@@ -171,6 +171,34 @@ multiTap($('btnStartOver'), ['🗑️ Start over', 'Are you sure? Tap again', `T
 multiTap($('btnRestore'), ['↩️ Restore', 'Tap again to restore the backup'], () => {
   restoreBackup();
   location.reload();
+});
+
+// ---------- Save codes ----------
+$('btnCopyCode').onclick = async () => {
+  const out = $('saveCodeOut');
+  try {
+    out.value = await saveCode();
+  } catch (err) {
+    $('codeMsg').textContent = 'This browser can’t make a save code.';
+    return console.error(err);
+  }
+  out.hidden = false;
+  try {
+    await navigator.clipboard.writeText(out.value);
+    $('codeMsg').textContent = '✓ Copied! Paste it on the other device.';
+  } catch {
+    out.select();
+    $('codeMsg').textContent = 'Copy the code in the box above.';
+  }
+};
+multiTap($('btnLoadCode'), ['📥 Load save code', `Tap again to replace this progress (backup kept ${BACKUP_DAYS} days)`], async () => {
+  try {
+    await loadSaveCode($('saveCodeIn').value);
+    location.reload();
+  } catch (err) {
+    console.warn(err);
+    $('codeMsg').textContent = 'That doesn’t look like a save code. Copy the whole code and try again.';
+  }
 });
 
 function update() {

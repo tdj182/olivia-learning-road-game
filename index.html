@@ -127,6 +127,20 @@
       <p class="total">Total stars: ⭐ <span id="totalStars">0</span></p>
 
       <section class="danger">
+        <h3>Move to another device</h3>
+        <p class="hint">Copy the save code here, send it to the other device (a text or email to yourself works), and paste it there.</p>
+        <div class="chips">
+          <button id="btnCopyCode" class="chip">📋 Copy save code</button>
+        </div>
+        <textarea id="saveCodeOut" class="code-box" readonly hidden></textarea>
+        <textarea id="saveCodeIn" class="code-box" placeholder="Paste a save code here"></textarea>
+        <div class="chips">
+          <button id="btnLoadCode" class="chip">📥 Load save code</button>
+        </div>
+        <p id="codeMsg" class="hint"></p>
+      </section>
+
+      <section class="danger">
         <h3>Start over</h3>
         <p class="hint">Clears the farm, pets, battles, stars and word stats (settings stay). A backup is kept for 3 days.</p>
         <button id="btnStartOver" class="chip danger-btn">🗑️ Start over</button>

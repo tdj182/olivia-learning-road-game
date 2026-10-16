@@ -25,14 +25,47 @@ export function backupInfo() {
   const b = store.get('owr-backup', null);
   return b && !backupOld(b) ? { at: new Date(b.at), until: new Date(b.at + BACKUP_DAYS * 86400e3) } : null;
 }
-export function startOver() {
+const readKeys = keys => {
   const data = {};
-  for (const k of PROGRESS_KEYS) { try { const v = localStorage.getItem(k); if (v !== null) data[k] = v; } catch { /* private mode */ } }
-  // Starting over twice shouldn't replace a real backup with a nearly empty one: keep the one with more stars.
+  for (const k of keys) { try { const v = localStorage.getItem(k); if (v !== null) data[k] = v; } catch { /* private mode */ } }
+  return data;
+};
+// Back up the current progress. Doing it twice shouldn't replace a real backup with a nearly
+// empty one, so a backup is only replaced by one with at least as many stars.
+function backUp() {
+  const data = readKeys(PROGRESS_KEYS);
   const old = backupInfo() && store.get('owr-backup', null);
   const stars = d => Number(d['owr-stars'] ?? 0);
   if (!old || stars(data) >= stars(old.data)) store.set('owr-backup', { at: Date.now(), data });
+}
+export function startOver() {
+  backUp();
   for (const k of PROGRESS_KEYS) { try { localStorage.removeItem(k); } catch { /* private mode */ } }
+}
+
+// ---------- Save codes (moving progress to another device) ----------
+// A save code is all the progress and settings as gzipped JSON in base64, behind a short tag.
+const CODE_TAG = 'WORDFARM1:';
+const CODE_KEYS = [...PROGRESS_KEYS, 'owr-settings'];
+const b64 = bytes => btoa(Array.from(bytes, b => String.fromCharCode(b)).join(''));
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const squeeze = async (bytes, Stream) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new Stream('gzip'))).arrayBuffer());
+
+export async function saveCode() {
+  const json = new TextEncoder().encode(JSON.stringify(readKeys(CODE_KEYS)));
+  return CODE_TAG + b64(await squeeze(json, CompressionStream));
+}
+// Loads a save code (the current progress goes into the backup first). Throws if the code is bad.
+export async function loadSaveCode(code) {
+  const text = code.replace(/\s+/g, '');
+  if (!text.startsWith(CODE_TAG)) throw new Error('not a save code');
+  const data = JSON.parse(new TextDecoder().decode(await squeeze(unb64(text.slice(CODE_TAG.length)), DecompressionStream)));
+  if (typeof data !== 'object' || !Object.keys(data).every(k => CODE_KEYS.includes(k) && typeof data[k] === 'string')) throw new Error('not a save code');
+  for (const v of Object.values(data)) JSON.parse(v); // every value must be saved JSON
+  backUp();
+  for (const k of CODE_KEYS) {
+    try { if (k in data) localStorage.setItem(k, data[k]); else if (k !== 'owr-settings') localStorage.removeItem(k); } catch { /* private mode */ }
+  }
 }
 export function restoreBackup() {
   const b = store.get('owr-backup', null);
