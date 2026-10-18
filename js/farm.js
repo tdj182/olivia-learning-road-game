@@ -391,5 +391,5 @@ export function createFarm({ getPool, onSettings }) {
   }
 
   layout(cols);
-  return { scene, camera, load, enter, exit, resize, update, onPointer, pause: closeChoice };
+  return { scene, camera, load, enter, exit, resize, update, onPointer, openChoice, pause: closeChoice };
 }

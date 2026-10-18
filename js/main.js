@@ -8,7 +8,8 @@ import { LINES } from './lines.js';
 import { createFarm } from './farm.js';
 import { createPets } from './pets.js';
 import { createBattle } from './battle.js';
-import { BATTLE_SPEEDS, foesFor } from './creatures.js';
+import { setupAdmin } from './admin.js';
+import { BATTLE_SPEEDS, SPELL_LETTER, foesFor } from './creatures.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('c');
@@ -26,6 +27,14 @@ const currentPool = roundPool; // the round's module (quest.js)
 const farm = createFarm({ getPool: roundPool, onSettings: openSettings });
 const pets = createPets({ getPool: roundPool, getCarePool: carePool, onSettings: openSettings, onChange: () => updateModeButton() });
 const battle = createBattle({ getPool: roundPool, onSettings: openSettings, onEnd: () => switchMode(pets) });
+
+const adminPanel = setupAdmin({
+  battle,
+  inBattle: () => mode === battle,
+  startBattle: () => switchMode(battle),
+  refresh: () => { renderHud(); updateModeButton(); renderSettings(); },
+  close: closeSettings,
+});
 
 // Every word in the round found twice: the battle is unlocked.
 onBattleReady(() => {
@@ -97,7 +106,7 @@ function renderSettings() {
   $('roundDown').disabled = r <= 1;
   $('roundUp').disabled = r >= maxRound();
   const { done, total } = learnProgress();
-  const step = quest.ready ? 'Battle unlocked.' : `Found ${done} of ${total} toward the battle (each word ${LEARN_TIMES} times).`;
+  const step = quest.ready ? 'Battle unlocked.' : `Found ${done} of ${total} toward the battle (each word ${LEARN_TIMES} times, every word once before any repeats).`;
   $('roundInfo').textContent = `${roundPool().join(', ')}. ${step}${quest.review ? ' Healing and feeding review every module so far.' : ''} Changing rounds starts the round over.`;
   $('mWords').setAttribute('aria-pressed', !numbers);
   $('mNumbers').setAttribute('aria-pressed', numbers);
@@ -118,7 +127,7 @@ function renderSettings() {
   }
   const secs = BATTLE_SPEEDS[settings.battleSpeed];
   const foes = foesFor(r + quest.lap * 3);
-  $('battleInfo').textContent = `${secs ? `${Math.round(Math.min(...foes.map(f => f.e.time)) * secs)}–${Math.round(Math.max(...foes.map(f => f.e.time)) * secs)} seconds per word. ` : 'No time limit. '}Battles won: ${battleState.wins}. This round: ${foes.map(f => f.e.name.replace(/^the /, '')).join(', ')}.`;
+  $('battleInfo').textContent = `${secs ? `${Math.round(Math.min(...foes.map(f => f.e.time)) * secs)}–${Math.round(Math.max(...foes.map(f => f.e.time)) * secs)} seconds per word, plus ${Math.round(SPELL_LETTER * secs * 10) / 10} per letter to spell it. ` : 'No time limit. '}Battles won: ${battleState.wins}. This round: ${foes.map(f => f.e.name.replace(/^the /, '')).join(', ')}.`;
 
   const choiceChips = $('choiceChips');
   choiceChips.innerHTML = '';
@@ -143,6 +152,7 @@ function renderSettings() {
   $('trickySection').hidden = !tricky.length;
   $('tricky').innerHTML = tricky.map(([w]) => `<span>${w}</span>`).join('');
   renderBackup();
+  adminPanel.render();
 }
 
 // ---------- Start over / restore ----------

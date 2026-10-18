@@ -9,12 +9,21 @@ function weightFor(word) {
   return 1 + s.m * 1.5 + (s.c === 0 ? 1 : 0) - Math.min(s.c, 4) * 0.15;
 }
 
+// The last few words asked (newest last), so it cycles through the pool instead of repeating.
+const recent = [];
+
 export function pickWord(pool, avoid) {
-  const choices = pool.length > 1 ? pool.filter(w => w !== avoid) : pool;
+  let choices = pool.length > 1 ? pool.filter(w => w !== avoid) : pool;
+  const skip = recent.slice(recent.length - Math.floor(choices.length / 2));
+  const fresh = choices.filter(w => !skip.includes(w));
+  if (fresh.length) choices = fresh;
   const weights = choices.map(weightFor);
   let r = Math.random() * weights.reduce((a, b) => a + b, 0);
-  for (let i = 0; i < choices.length; i++) { r -= weights[i]; if (r <= 0) return choices[i]; }
-  return choices[choices.length - 1];
+  let word = choices[choices.length - 1];
+  for (let i = 0; i < choices.length; i++) { r -= weights[i]; if (r <= 0) { word = choices[i]; break; } }
+  recent.push(word);
+  if (recent.length > 50) recent.shift();
+  return word;
 }
 
 function editDistance(a, b) {

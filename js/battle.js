@@ -1,24 +1,25 @@
 import * as THREE from 'three';
-import { creatureById, foesFor, petHp, petHit, HUNGRY_HIT, COMBO, COUNTER_EVERY, BATTLE_SPEEDS, WIN_STARS } from './creatures.js';
+import { creatureById, foesFor, petHp, petHit, HUNGRY_HIT, COMBO, COUNTER_EVERY, BATTLE_SPEEDS, SPELL_LETTER, WIN_STARS } from './creatures.js';
 import { pets, savePets, belly, setBelly, health, setHealth, battle, saveBattle, settings, progress } from './state.js';
 import { battleRound, wonRound, lostRound } from './quest.js';
 import { LINES } from './lines.js';
 import { loadModel, normalize, burst, sfx, say, floatText, toScreen, CONFETTI } from './fx.js';
-import { ask, choosing, closeChoice, renderHud, sayTarget } from './ui.js';
+import { spell, choosing, closeChoice, renderHud, sayTarget, currentTarget } from './ui.js';
 import { buildCreature, play } from './creature3d.js';
 
 // ---------- Tuning ----------
 const PET_H = 1.6, PET_GROWN_H = 2.2, FOE_H = 2.1, BOSS_H = 2.9;
 const FLY_Y = 0.8;
-const GRACE = 1.6;   // seconds before the timer starts (while the word is being said)
+const GRACE = 2.2;   // seconds before the timer starts (while the word is being said)
 const SHOT = 0.5;    // seconds a shot takes to fly
 const NATURE = [['MapleTree_1', 6.5], ['BirchTree_2', 7], ['MapleTree_3', 7.5], ['Bush_Flowers', 1.4]];
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const rand = (a, b) => a + Math.random() * (b - a);
 
-// Battles: all her pets, one at a time (strongest first), against the round's monsters, one after
-// another. Each word she finds is an attack. A wrong tap, or running out of time, lets the monster
+// Battles: her pets, one at a time, against the round's monsters, one after another. She can
+// switch pets between attacks by tapping them (the one she picks leads the next battle too).
+// Each word she spells is an attack. A wrong letter, or running out of time, lets the monster
 // attack. Pets that run out of health are tired (studying heals them); when all are, the monsters win.
 export function createBattle({ getPool, onSettings, onEnd }) {
   const $ = id => document.getElementById(id);
@@ -85,7 +86,7 @@ export function createBattle({ getPool, onSettings, onEnd }) {
   let foeBusy = false; // the monster is mid-attack
   let run = 0;       // bumps on every new battle, so old timeouts stop
 
-  const limit = () => (foe ? foe.e.time * BATTLE_SPEEDS[settings.battleSpeed] : 0);
+  const limit = () => (foe ? (foe.e.time + SPELL_LETTER * (currentTarget()?.length ?? 0)) * BATTLE_SPEEDS[settings.battleSpeed] : 0);
   const power = p => health(p) + petHit(p) * 3;
 
   async function spawn(file, height, at, fly) {
@@ -108,8 +109,10 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     foeBusy = false;
     combo = 0;
     clear();
-    // All her pets (main.js only starts a battle when they're all healed), strongest first.
-    team = [...pets.owned].sort((a, b) => power(b) - power(a))
+    // All her pets (main.js only starts a battle when they're all healed): the one she picked
+    // last time first, then strongest first.
+    const lead = p => (p.id === battle.lead ? 1e6 : 0);
+    team = [...pets.owned].sort((a, b) => lead(b) + power(b) - lead(a) - power(a))
       .map(data => ({ data, c: creatureById(data.id), hp: health(data), max: petHp(data) }));
     foes = foesFor(battleRound()).map(x => ({ ...x, max: x.hp }));
     saved = false;
@@ -161,12 +164,30 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     const pool = getPool();
     if (!pool.length) { stop(); return onSettings(); }
     clock = -GRACE;
-    ask({
-      pool, title: '⚔️ Attack!', line: LINES.attackWhich, cls: 'attack', closable: false,
-      icon: () => '⚡',
+    spell({
+      pool, title: '⚔️ Spell it to attack!', line: LINES.spellWhich, cls: 'attack',
       done: (b, from, missed) => attack(missed === 0),
       wrong: () => foeAttack(),
     });
+  }
+
+  // She tapped one of her pets: it comes in (between attacks, while she's spelling).
+  let swapping = false;
+  async function swapTo(m) {
+    if (phase !== 'fight' || swapping || foeBusy || locked > 0 || m === mine || m.hp <= 0 || !choosing()) return;
+    const my = run;
+    swapping = true;
+    locked = 99;
+    battle.lead = m.data.id;
+    saveBattle();
+    try {
+      await sendIn(m, false);
+      if (my !== run) return;
+      play(m.f, 'jump');
+      sayTarget([m.c.go]);
+      clock = Math.min(clock, 0);
+      locked = 1.2;
+    } finally { swapping = false; }
   }
 
   // A shot flies from one fighter to the other.
@@ -244,7 +265,7 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     renderBars();
     if (mine.hp > 0) {
       play(mine.f, 'hit');
-      if (slow) sayTarget([LINES.attackWhich]);
+      if (slow) sayTarget([LINES.spellWhich]);
       clock = 0;
       locked = 0.4;
       return;
@@ -349,7 +370,15 @@ export function createBattle({ getPool, onSettings, onEnd }) {
       $('bPetHp').style.width = `${(mine.hp / mine.max) * 100}%`;
       $('bPetNum').textContent = mine.hp;
       $('bFoes').innerHTML = foes.length > 1 ? foes.map(x => `<span class="${x === foe ? 'now' : x.hp > 0 ? '' : 'out'}" style="background:${x.e.color}">${x.e.name.replace(/^the /, '')[0]}</span>`).join('') : '';
-      $('bTeam').innerHTML = team.map(m => `<span class="${m === mine ? 'now' : m.hp > 0 ? '' : 'out'}" style="background:${m.c.color}">${m.c.name[0]}</span>`).join('');
+      $('bTeam').replaceChildren(...team.map(m => {
+        const b = document.createElement('button');
+        b.className = m === mine ? 'now' : m.hp > 0 ? '' : 'out';
+        b.style.background = m.c.color;
+        b.textContent = m.c.name[0];
+        b.setAttribute('aria-label', m.c.name);
+        b.onclick = () => swapTo(m);
+        return b;
+      }));
       $('bHungry').hidden = belly(mine.data) > 0;
     }
   }
@@ -437,5 +466,16 @@ export function createBattle({ getPool, onSettings, onEnd }) {
     }
   }
 
-  return { scene, camera, load, enter, exit: stop, resize, update, onPointer() {}, pause() {} };
+  // Admin mode: 'foe' beats this monster, 'win' or 'lose' ends the battle. False if it can't now.
+  function cheat(kind) {
+    if (phase !== 'fight' || !choosing() || locked > 0 || foeBusy || swapping) return false;
+    closeChoice();
+    locked = 99;
+    if (kind === 'lose') { for (const m of team) m.hp = 0; renderBars(); lose(); }
+    else if (kind === 'win') { for (const x of foes) x.hp = 0; renderBars(); win(); }
+    else { foe.hp = 0; renderBars(); foeDown(); }
+    return true;
+  }
+
+  return { scene, camera, load, enter, exit: stop, resize, update, onPointer() {}, pause() {}, cheat };
 }

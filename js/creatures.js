@@ -60,7 +60,9 @@ export const HEAL_WORD = 0.25;
 export const COUNTER_EVERY = 2;
 // Three right in a row (first try) is a super attack: double damage.
 export const COMBO = 3;
-// Grown-up setting: how long she has per word (multiplies each monster's time). 0 = no timer.
+// She spells each word in battles, so she gets each monster's time plus SPELL_LETTER seconds per letter.
+export const SPELL_LETTER = 2.5;
+// Grown-up setting: how long she has per word (multiplies the time above). 0 = no timer.
 export const BATTLE_SPEEDS = { off: 0, slow: 1.6, normal: 1, fast: 0.7 };
 // A win: stars and the next egg. Pets that fought get hungrier.
 export const WIN_STARS = 3;

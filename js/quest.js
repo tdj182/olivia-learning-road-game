@@ -35,6 +35,18 @@ export function learnProgress() {
   return { done, total: pool.length * LEARN_TIMES };
 }
 
+// While she's learning the round: the round's words in `pool` she has found the fewest times, or
+// null. Asking these first goes through every word once, then every word again, with no repeats
+// of words she's already done (so no extra farming while she waits for one last word to come up).
+export function neediest(pool) {
+  if (quest.ready) return null;
+  const round = roundPool();
+  const left = pool.filter(w => round.includes(w) && (quest.found[w] ?? 0) < LEARN_TIMES);
+  if (!left.length) return null;
+  const fewest = Math.min(...left.map(w => quest.found[w] ?? 0));
+  return left.filter(w => (quest.found[w] ?? 0) === fewest);
+}
+
 let readyListener = () => {};
 export const onBattleReady = fn => { readyListener = fn; };
 

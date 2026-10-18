@@ -150,6 +150,36 @@
         </div>
       </section>
 
+      <section class="danger">
+        <h3>Admin</h3>
+        <div id="adminLocked" class="chips">
+          <input id="adminPass" class="admin-pass" type="password" placeholder="Password" autocomplete="off">
+          <button id="btnAdminUnlock" class="chip">🔓 Unlock</button>
+        </div>
+        <div id="adminTools" hidden>
+          <p class="hint">Shortcuts for testing. They change her real progress, so use a save code or Start over to undo.</p>
+          <div id="adminBattle" class="chips" hidden>
+            <button class="chip" data-admin="foe">💥 Beat this monster</button>
+            <button class="chip" data-admin="win">🏆 Win this battle</button>
+            <button class="chip" data-admin="lose">😴 Lose this battle</button>
+          </div>
+          <div class="chips">
+            <button class="chip" id="btnAdminAnswers" aria-pressed="false">💡 Show answers</button>
+            <button class="chip" data-admin="ready">⚔️ Unlock battle</button>
+            <button class="chip" data-admin="battle">⚔️ Battle now</button>
+            <button class="chip" data-admin="heal">❤️ Heal pets</button>
+            <button class="chip" data-admin="feed">🍎 Fill bellies</button>
+            <button class="chip" data-admin="evolve">✨ Evolve pets</button>
+            <button class="chip" data-admin="egg">🥚 +1 egg</button>
+            <button class="chip" data-admin="food">🧺 +5 food</button>
+            <button class="chip" data-admin="ripen">🌽 Ripen crops</button>
+            <button class="chip" data-admin="stars">⭐ +10 stars</button>
+            <button class="chip" id="btnAdminLock">🔒 Lock</button>
+          </div>
+        </div>
+        <p id="adminMsg" class="hint"></p>
+      </section>
+
       <button id="btnSettingsDone" class="big">Let's play! 🌱</button>
       <p id="offlineReady" class="hint" hidden>✓ Ready to play offline</p>
     </div>

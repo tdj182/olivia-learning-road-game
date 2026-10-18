@@ -125,6 +125,10 @@ export function setHealth(p, hp) {
   p.hurt = Math.max(0, Math.round(petHp(p) - hp));
 }
 
+// Admin mode (grown-up settings, for testing): on, and whether the right answers glow.
+export const admin = Object.assign({ on: false, answers: false }, store.get('owr-admin', {}));
+export const saveAdmin = () => store.set('owr-admin', admin);
+
 // wins: battles won ever.
 export const battle = Object.assign({ wins: 0 }, store.get('owr-battle', {}));
 if ('stage' in battle) { battle.wins = Math.max(battle.wins ?? 0, battle.stage); delete battle.stage; }

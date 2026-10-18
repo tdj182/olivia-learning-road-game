@@ -24,6 +24,7 @@ export const LINES = {
   noFood: 'Your pets are hungry! Go pick food on the farm.',
   full: "I'm full! Thank you!",
   attackWhich: 'Find the word that says',
+  spellWhich: 'Spell the word',
   tooSlow: 'Too slow!',
   superAttack: 'Super attack!',
   tired: 'Your pet is tired!',
